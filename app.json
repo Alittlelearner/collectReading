@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "学习收藏夹",
+    "slug": "unified-bookmark-tracker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#0f172a"
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.learninghub.bookmarktracker"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0f172a"
+      },
+      "package": "com.learninghub.bookmarktracker"
+    },
+    "platforms": ["ios", "android", "web"]
+  }
+}
