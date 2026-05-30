@@ -20,6 +20,14 @@
       },
       "package": "com.learninghub.bookmarktracker"
     },
-    "platforms": ["ios", "android", "web"]
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "plugins": [
+      "expo-status-bar"
+    ],
+    "sdkVersion": "54.0.0"
   }
 }
