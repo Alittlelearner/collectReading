@@ -5,7 +5,7 @@ import { Tag } from '../types';
 export class TagService {
   async getAll(): Promise<Tag[]> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync(
       `SELECT t.*, (SELECT COUNT(*) FROM bookmark_tags bt WHERE bt.tag_id = t.id) as bookmark_count
        FROM tags t
        ORDER BY t.created_at DESC`,
@@ -60,7 +60,7 @@ export class TagService {
       await db.runAsync(`UPDATE tags SET ${updates.join(', ')} WHERE id = ?`, ...params);
     }
 
-    const row = await db.getFirstAsync<any>('SELECT * FROM tags WHERE id = ?', id);
+    const row = await db.getFirstAsync('SELECT * FROM tags WHERE id = ?', id);
     if (!row) throw new Error('NOT_FOUND');
 
     return this.mapRow(row);
@@ -68,7 +68,7 @@ export class TagService {
 
   async delete(id: string): Promise<void> {
     const db = await getDatabase();
-    await db.runAsync('DELETE FROM tags WHERE id = ?', id);
+    await db.runAsync('DELETE FROM tags WHERE id = ?', [id]);
   }
 
   async attachTag(bookmarkId: string, tagId: string): Promise<void> {
@@ -91,7 +91,7 @@ export class TagService {
 
   private async mapRow(row: any): Promise<Tag> {
     const db = await getDatabase();
-    const countRow = await db.getFirstAsync<{ count: number }>(
+    const countRow = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM bookmark_tags WHERE tag_id = ?',
       row.id,
     );

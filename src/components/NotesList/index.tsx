@@ -113,7 +113,7 @@ export default function NotesList({ notes, loading, onAdd, onUpdate, onDelete }:
         </TouchableOpacity>
       </View>
 
-      {loading && <Text style={styles.loadingText}>加载中...</Text>}
+      {!!loading && <Text style={styles.loadingText}>加载中...</Text>}
 
       {!loading && notes.length === 0 && (
         <Text style={styles.emptyText}>暂无笔记</Text>

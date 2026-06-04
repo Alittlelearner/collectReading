@@ -51,7 +51,7 @@ export default function ResurfaceCard({ bookmark, onPress, onSkip, onDone }: Res
 
 function getSourceLabel(type: string): string {
   const labels: Record<string, string> = {
-    bilibili: 'B站', zhihu: '知乎', wechat: '公众号',
+    bilibili: 'B 站', zhihu: '知乎', wechat: '公众号',
     ebook: '电子书', website: '网站', metasearch: '秘塔', other: '其他',
   };
   return labels[type] || '其他';

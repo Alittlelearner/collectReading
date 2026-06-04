@@ -8,6 +8,9 @@ import {
   SectionList,
   SafeAreaView,
   TouchableOpacity,
+  Alert,
+  Platform,
+  Linking,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useBookmarks } from '../hooks/useBookmarks';
@@ -65,14 +68,57 @@ export default function HomeScreen() {
       .map((k) => ({ title: k, data: groups[k] }));
   })();
 
+  const handleDelete = useCallback((bookmarkId: string, itemTitle?: string) => {
+    Alert.alert(
+      '确认删除',
+      `确定要删除"${itemTitle || '这个书签'}"吗？`,
+      [
+        { text: '取消', style: 'cancel' },
+        { 
+          text: '删除', 
+          style: 'destructive', 
+          onPress: () => bookmarks.deleteBookmark(bookmarkId) 
+        },
+      ]
+    );
+  }, [bookmarks]);
+
+  const handleOpenLink = useCallback((url: string) => {
+    if (Platform.OS === 'web') {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } else {
+      Linking.openURL(url);
+    }
+  }, []);
+
+  const handleBookmarkLongPress = useCallback((item: (typeof bookmarks.bookmarks)[0]) => {
+    Alert.alert(
+      item.title || '书签',
+      undefined,
+      [
+        { 
+          text: '打开链接', 
+          onPress: () => handleOpenLink(item.url) 
+        },
+        { 
+          text: '删除', 
+          style: 'destructive', 
+          onPress: () => handleDelete(item.id, item.title) 
+        },
+        { text: '取消', style: 'cancel' },
+      ]
+    );
+  }, [handleOpenLink, handleDelete]);
+
   const renderBookmark = useCallback(
     ({ item }: { item: (typeof bookmarks.bookmarks)[0] }) => (
       <BookmarkCard
         bookmark={item}
         onPress={() => navigation.navigate('BookmarkDetail', { bookmarkId: item.id })}
+        onLongPress={() => handleBookmarkLongPress(item)}
       />
     ),
-    [],
+    [navigation, handleBookmarkLongPress],
   );
 
   const renderSectionHeader = ({ section }: { section: { title: string } }) => (
@@ -133,9 +179,20 @@ export default function HomeScreen() {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>收藏</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('StatsDashboard')}>
-          <Text style={styles.statsBtn}>📊</Text>
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity onPress={() => navigation.navigate('MultiUrlTest')}>
+            <Text style={styles.multiTestBtn}>🔬</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('SimpleTest')}>
+            <Text style={styles.simpleTestBtn}>🔧</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('TestAddBookmark')}>
+            <Text style={styles.testBtn}>🧪</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('StatsDashboard')}>
+            <Text style={styles.statsBtn}>📊</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
@@ -172,6 +229,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
+    position: 'relative',
   },
   header: {
     flexDirection: 'row',
@@ -180,10 +238,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  headerButtons: {
+    flexDirection: 'row',
+    gap: spacing.md,
+  },
   headerTitle: {
     color: colors.text,
     fontSize: 24,
     fontWeight: '700',
+  },
+  multiTestBtn: {
+    fontSize: 22,
+  },
+  simpleTestBtn: {
+    fontSize: 22,
+  },
+  testBtn: {
+    fontSize: 22,
   },
   statsBtn: {
     fontSize: 22,

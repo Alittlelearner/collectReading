@@ -38,7 +38,7 @@ export class BookmarkService {
     const column = validSortColumns.includes(sortBy) ? sortBy : 'created_at';
     query += ` ORDER BY ${column} ${sortOrder === 'asc' ? 'ASC' : 'DESC'}`;
 
-    const rows = await db.getAllAsync<any>(query, ...params);
+    const rows = await db.getAllAsync(query, ...params);
     const bookmarks = await Promise.all(rows.map((row) => this.mapRow(row)));
 
     if (filters?.tagId) {
@@ -51,7 +51,7 @@ export class BookmarkService {
 
   async getById(id: string): Promise<Bookmark | null> {
     const db = await getDatabase();
-    const row = await db.getFirstAsync<any>('SELECT * FROM bookmarks WHERE id = ?', id);
+    const row = await db.getFirstAsync('SELECT * FROM bookmarks WHERE id = ?', id);
     if (!row) return null;
     return this.mapRow(row);
   }
@@ -59,7 +59,7 @@ export class BookmarkService {
   async create(dto: CreateBookmarkDTO): Promise<Bookmark> {
     const db = await getDatabase();
 
-    const existing = await db.getFirstAsync<any>(
+    const existing = await db.getFirstAsync(
       'SELECT id FROM bookmarks WHERE url = ?',
       dto.url,
     );
@@ -119,6 +119,7 @@ export class BookmarkService {
 
   async delete(id: string): Promise<void> {
     const db = await getDatabase();
+    await db.runAsync('DELETE FROM bookmark_tags WHERE bookmark_id = ?', id);
     await db.runAsync('DELETE FROM bookmarks WHERE id = ?', id);
   }
 
@@ -148,6 +149,26 @@ export class BookmarkService {
     }
 
     return (await this.getById(id))!;
+  }
+
+  async updateStatus(id: string, status: Bookmark['learningStatus']): Promise<void> {
+    const db = await getDatabase();
+    const now = Date.now();
+    const updates: string[] = ['learning_status = ?', 'updated_at = ?'];
+    const params: any[] = [status, now];
+
+    if (status === 'read' || status === 'archived') {
+      updates.unshift('read_at = ?');
+      params.splice(1, 0, now);
+    } else if (status === 'unread') {
+      updates.unshift('read_at = NULL');
+    }
+
+    await db.runAsync(
+      `UPDATE bookmarks SET ${updates.join(', ')} WHERE id = ?`,
+      ...params,
+      id,
+    );
   }
 
   async search(query: string): Promise<Bookmark[]> {
@@ -207,7 +228,7 @@ export class BookmarkService {
 
   private async getBookmarkIdsByTag(tagId: string): Promise<string[]> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<{ bookmark_id: string }>(
+    const rows = await db.getAllAsync(
       'SELECT bookmark_id FROM bookmark_tags WHERE tag_id = ?',
       tagId,
     );
@@ -237,7 +258,7 @@ export class BookmarkService {
 
   private async getTagsForBookmark(bookmarkId: string): Promise<Tag[]> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync(
       `SELECT t.*, (SELECT COUNT(*) FROM bookmark_tags bt WHERE bt.tag_id = t.id) as bookmark_count
        FROM tags t
        INNER JOIN bookmark_tags bt ON bt.tag_id = t.id
@@ -255,7 +276,7 @@ export class BookmarkService {
 
   private async getNoteCount(bookmarkId: string): Promise<number> {
     const db = await getDatabase();
-    const row = await db.getFirstAsync<{ count: number }>(
+    const row = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM notes WHERE bookmark_id = ?',
       bookmarkId,
     );

@@ -20,7 +20,7 @@ const ACHIEVEMENT_RULES: Record<string, (ctx: AchievementContext) => boolean> = 
 export class AchievementService {
   async getAll(): Promise<Achievement[]> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<any>('SELECT * FROM achievements ORDER BY id');
+    const rows = await db.getAllAsync('SELECT * FROM achievements ORDER BY id');
     return rows.map((r) => ({
       id: r.id,
       achievementKey: r.achievement_key,
@@ -44,8 +44,7 @@ export class AchievementService {
       if (rule && rule(context)) {
         await db.runAsync(
           'UPDATE achievements SET unlocked_at = ? WHERE id = ?',
-          now,
-          achievement.id,
+          [now, achievement.id],
         );
         achievement.unlockedAt = now;
         unlocked.push(achievement);
@@ -58,16 +57,16 @@ export class AchievementService {
   async getContext(): Promise<AchievementContext> {
     const db = await getDatabase();
 
-    const bookmarkRow = await db.getFirstAsync<{ count: number }>(
+    const bookmarkRow = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM bookmarks',
     );
-    const readRow = await db.getFirstAsync<{ count: number }>(
+    const readRow = await db.getFirstAsync(
       "SELECT COUNT(*) as count FROM bookmarks WHERE learning_status = 'read'",
     );
-    const tagRow = await db.getFirstAsync<{ count: number }>(
+    const tagRow = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM tags',
     );
-    const noteRow = await db.getFirstAsync<{ count: number }>(
+    const noteRow = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM notes',
     );
 
@@ -84,7 +83,7 @@ export class AchievementService {
 
   private async calculateCurrentStreak(): Promise<number> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<{ date: string }>(
+    const rows = await db.getAllAsync(
       'SELECT date FROM daily_stats WHERE streak_eligible = 1 ORDER BY date DESC',
     );
 

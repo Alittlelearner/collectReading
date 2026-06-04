@@ -25,9 +25,6 @@
       "android",
       "web"
     ],
-    "plugins": [
-      "expo-status-bar"
-    ],
     "sdkVersion": "54.0.0"
   }
 }

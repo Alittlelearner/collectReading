@@ -1,47 +1,86 @@
-import React from 'react';
-import { Platform, View, Text, StyleSheet } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { Platform, View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import RootNavigator from './src/navigation/RootNavigator';
+import { runMigrations } from './src/db/migrations';
+import { seedData } from './src/db/seed';
+import { colors } from './src/theme/colors';
+import { spacing } from './src/theme/spacing';
 
 export default function App() {
-  if (Platform.OS === 'web') {
+  const [ready, setReady] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function init() {
+      try {
+        console.log('[App] Starting migrations...');
+        await runMigrations();
+        console.log('[App] Migrations complete');
+        await seedData();
+        console.log('[App] Seed data complete');
+        setReady(true);
+      } catch (e: any) {
+        console.error('[App] Init error:', e);
+        setError(e.message || '初始化失败');
+      }
+    }
+    init();
+  }, []);
+
+  if (error) {
     return (
-      <View style={styles.container}>
-        <Text style={styles.icon}>🚧</Text>
-        <Text style={styles.title}>Web 版本尚未支持</Text>
-        <Text style={styles.info}>本应用使用 SQLite 数据库，目前仅支持 iOS 和 Android 平台</Text>
-        <Text style={styles.subinfo}>请在手机上使用 Expo Go 打开</Text>
+      <View style={styles.center}>
+        <Text style={styles.errorIcon}>❌</Text>
+        <Text style={styles.errorText}>初始化失败</Text>
+        <Text style={styles.errorDetail}>{error}</Text>
       </View>
     );
   }
 
-  return null;
+  if (!ready) {
+    return (
+      <View style={styles.center}>
+        <Text style={styles.loadingIcon}>📚</Text>
+        <ActivityIndicator color={colors.primary} size="large" style={{ marginTop: spacing.lg }} />
+        <Text style={styles.loadingText}>正在准备学习空间...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <RootNavigator />
+      <StatusBar style="light" />
+    </GestureHandlerRootView>
+  );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  center: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#0f172a',
-    padding: 40,
+    backgroundColor: colors.background,
+    padding: spacing.xxxl,
   },
-  icon: { fontSize: 64, marginBottom: 20 },
-  title: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  info: {
-    color: '#94a3b8',
+  loadingIcon: { fontSize: 48 },
+  loadingText: {
+    color: colors.textSecondary,
     fontSize: 15,
-    lineHeight: 24,
-    textAlign: 'center',
-    marginBottom: 10,
+    marginTop: spacing.md,
   },
-  subinfo: {
-    color: '#64748b',
+  errorIcon: { fontSize: 48 },
+  errorText: {
+    color: colors.error,
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: spacing.lg,
+  },
+  errorDetail: {
+    color: colors.textMuted,
     fontSize: 13,
-    textAlign: 'center',
+    marginTop: spacing.xs,
   },
 });

@@ -9,6 +9,9 @@ export type HomeStackParamList = {
   TagManage: undefined;
   SourceGroup: { sourceType: string } | undefined;
   StatsDashboard: undefined;
+  TestAddBookmark: undefined;
+  SimpleTest: undefined;
+  MultiUrlTest: undefined;
 };
 
 export type ProfileStackParamList = {

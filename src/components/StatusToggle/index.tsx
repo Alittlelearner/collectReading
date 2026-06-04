@@ -11,15 +11,21 @@ interface StatusToggleProps {
 }
 
 export default function StatusToggle({ status, onToggle, size = 'normal' }: StatusToggleProps) {
-  const isRead = status === 'read';
   const isSmall = size === 'small';
+  
+  // 根据不用的状态显示不同的文案和样式
+  const config = {
+    unread: { label: '未读', color: colors.textMuted, bg: colors.surfaceLight },
+    read: { label: '已读', color: colors.success, bg: colors.success + '20' },
+    archived: { label: '已归档', color: colors.primary, bg: colors.primary + '20' },
+  }[status || 'unread'] || { label: '未读', color: colors.textMuted, bg: colors.surfaceLight };
 
   return (
     <TouchableOpacity
       style={[
         styles.container,
         isSmall && styles.containerSmall,
-        { backgroundColor: isRead ? colors.success + '20' : colors.surfaceLight },
+        { backgroundColor: config.bg },
       ]}
       onPress={onToggle}
       activeOpacity={0.7}
@@ -28,17 +34,17 @@ export default function StatusToggle({ status, onToggle, size = 'normal' }: Stat
         style={[
           styles.dot,
           isSmall && styles.dotSmall,
-          { backgroundColor: isRead ? colors.success : colors.textMuted },
+          { backgroundColor: config.color },
         ]}
       />
       <Text
         style={[
           styles.label,
           isSmall && styles.labelSmall,
-          { color: isRead ? colors.success : colors.textSecondary },
+          { color: config.color },
         ]}
       >
-        {isRead ? '已读' : '未读'}
+        {config.label}
       </Text>
     </TouchableOpacity>
   );

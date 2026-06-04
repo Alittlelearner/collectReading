@@ -1,6 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { View, TextInput, Text, StyleSheet, ActivityIndicator } from 'react-native';
-import * as Clipboard from 'expo-clipboard';
 import { colors } from '../../theme/colors';
 import { spacing, borderRadius } from '../../theme/spacing';
 
@@ -13,20 +12,7 @@ interface URLInputProps {
 }
 
 export default function URLInput({ value, onChangeText, loading, error, autoFocus = true }: URLInputProps) {
-  const [checked, setChecked] = useState(false);
-
-  useEffect(() => {
-    if (!checked && !value) {
-      Clipboard.getStringAsync().then((text) => {
-        if (text && /^https?:\/\//.test(text.trim())) {
-          onChangeText(text.trim());
-        }
-        setChecked(true);
-      });
-    }
-  }, []);
-
-  const isValid = !value || /^https?:\/\/.+/.test(value);
+  const isValid = value === '' || /^https?:\/\/.+/.test(value);
 
   return (
     <View style={styles.container}>
@@ -43,14 +29,14 @@ export default function URLInput({ value, onChangeText, loading, error, autoFocu
         returnKeyType="done"
         editable={!loading}
       />
-      {loading && (
+      {!!loading && (
         <ActivityIndicator
           style={styles.loader}
           color={colors.primary}
           size="small"
         />
       )}
-      {error && <Text style={styles.error}>{error}</Text>}
+      {!!error && <Text style={styles.error}>{error}</Text>}
       {!isValid && value.length > 0 && (
         <Text style={styles.error}>请输入有效链接</Text>
       )}

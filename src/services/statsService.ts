@@ -7,7 +7,7 @@ export class StatsService {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync(
       'SELECT * FROM daily_stats WHERE date >= ? ORDER BY date ASC',
       startDate.toISOString().slice(0, 10),
     );
@@ -23,10 +23,10 @@ export class StatsService {
   async getSummary(): Promise<StatSummary> {
     const db = await getDatabase();
 
-    const totalRow = await db.getFirstAsync<{ count: number }>(
+    const totalRow = await db.getFirstAsync(
       'SELECT COUNT(*) as count FROM bookmarks',
     );
-    const readRow = await db.getFirstAsync<{ count: number }>(
+    const readRow = await db.getFirstAsync(
       "SELECT COUNT(*) as count FROM bookmarks WHERE learning_status = 'read'",
     );
 
@@ -35,21 +35,21 @@ export class StatsService {
     const readRate = totalBookmarks > 0 ? totalRead / totalBookmarks : 0;
 
     const today = new Date().toISOString().slice(0, 10);
-    const todayRow = await db.getFirstAsync<{ count: number }>(
+    const todayRow = await db.getFirstAsync(
       "SELECT COUNT(*) as count FROM bookmarks WHERE learning_status = 'read' AND date(read_at / 1000, 'unixepoch') = ?",
       today,
     );
 
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
-    const weeklyRow = await db.getFirstAsync<{ count: number }>(
+    const weeklyRow = await db.getFirstAsync(
       "SELECT COUNT(*) as count FROM bookmarks WHERE learning_status = 'read' AND read_at >= ?",
       weekAgo.getTime(),
     );
 
     const monthAgo = new Date();
     monthAgo.setDate(monthAgo.getDate() - 30);
-    const monthlyRow = await db.getFirstAsync<{ count: number }>(
+    const monthlyRow = await db.getFirstAsync(
       "SELECT COUNT(*) as count FROM bookmarks WHERE learning_status = 'read' AND read_at >= ?",
       monthAgo.getTime(),
     );
@@ -97,7 +97,7 @@ export class StatsService {
 
   private async calculateCurrentStreak(): Promise<number> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<{ date: string }>(
+    const rows = await db.getAllAsync(
       'SELECT date FROM daily_stats WHERE streak_eligible = 1 ORDER BY date DESC',
     );
 
@@ -129,7 +129,7 @@ export class StatsService {
 
   private async calculateLongestStreak(): Promise<number> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<{ date: string }>(
+    const rows = await db.getAllAsync(
       'SELECT date FROM daily_stats WHERE streak_eligible = 1 ORDER BY date ASC',
     );
 

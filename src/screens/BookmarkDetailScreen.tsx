@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, Linking, Platform } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { BookmarkService } from '../services/bookmarkService';
 import { useBookmarks } from '../hooks/useBookmarks';
@@ -33,23 +33,43 @@ export default function BookmarkDetailScreen() {
   }
 
   const handleToggleStatus = async () => {
-    await bookmarks.toggleStatus(bookmark.id);
+    // unread -> archived (跳过 read，因为擦亮后直接归档)
+    // read -> archived
+    // archived -> unread (重置)
+    const newStatus: Bookmark['learningStatus'] = 
+      bookmark.learningStatus === 'unread' ? 'archived' : 
+      bookmark.learningStatus === 'read' ? 'archived' : 'unread';
+    
+    await bookmarkService.updateStatus(bookmark.id, newStatus);
     const updated = await bookmarkService.getById(bookmark.id);
     if (updated) setBookmark(updated);
   };
 
   const handleDelete = () => {
-    Alert.alert('删除收藏', '确定要删除这条收藏吗？', [
-      { text: '取消', style: 'cancel' },
-      {
-        text: '删除',
-        style: 'destructive',
-        onPress: async () => {
-          await bookmarks.deleteBookmark(bookmark.id);
-          navigation.goBack();
-        },
-      },
-    ]);
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm('确定要删除这条收藏吗？');
+      if (confirmed) {
+        executeDelete();
+      }
+    } else {
+      Alert.alert(
+        '删除收藏',
+        '确定要删除这条收藏吗？',
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '删除',
+            style: 'destructive',
+            onPress: () => executeDelete(),
+          },
+        ]
+      );
+    }
+  };
+
+  const executeDelete = async () => {
+    await bookmarks.deleteBookmark(bookmark.id);
+    navigation.goBack();
   };
 
   const handleOpenLink = () => {
@@ -89,47 +109,16 @@ export default function BookmarkDetailScreen() {
         </View>
       ) : null}
 
-      {bookmark.tags.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>标签</Text>
-          <View style={styles.tagRow}>
-            {bookmark.tags.map((tag) => (
-              <View key={tag.id} style={[styles.tag, { backgroundColor: tag.color + '20' }]}>
-                <Text style={[styles.tagText, { color: tag.color }]}>{tag.name}</Text>
-              </View>
-            ))}
-          </View>
-        </View>
-      )}
-
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>信息</Text>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>域名</Text>
-          <Text style={styles.infoValue}>{bookmark.sourceDomain}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>添加时间</Text>
-          <Text style={styles.infoValue}>{formatDate(bookmark.createdAt)}</Text>
-        </View>
-        <View style={styles.infoRow}>
-          <Text style={styles.infoLabel}>阅读时间</Text>
-          <Text style={styles.infoValue}>{formatDate(bookmark.readAt)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.notesSection}>
-        <Text style={styles.sectionTitle}>笔记</Text>
         <NotesList
           notes={notes.notes}
-          loading={notes.loading}
           onAdd={notes.addNote}
           onUpdate={notes.updateNote}
           onDelete={notes.deleteNote}
         />
       </View>
 
-      <View style={styles.actions}>
+<View style={styles.actions}>
         <TouchableOpacity style={styles.openBtn} onPress={handleOpenLink}>
           <Text style={styles.openBtnText}>打开原链接</Text>
         </TouchableOpacity>
@@ -263,6 +252,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     borderRadius: borderRadius.md,
     alignItems: 'center',
+    zIndex: 1000,
   },
   deleteBtnText: {
     color: colors.error,

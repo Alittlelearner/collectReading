@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, Share, Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import { getDatabase } from '../db/database';
 import { useReminder } from '../hooks/useReminder';
 import { colors } from '../theme/colors';
@@ -39,42 +38,37 @@ export default function SettingsScreen() {
   const handleExport = async () => {
     try {
       const db = await getDatabase();
-      const [bookmarks, tags, bookmarkTags, notes, dailyStats, achievements, settings] = await Promise.all([
-        db.getAllAsync('SELECT * FROM bookmarks'),
-        db.getAllAsync('SELECT * FROM tags'),
-        db.getAllAsync('SELECT * FROM bookmark_tags'),
-        db.getAllAsync('SELECT * FROM notes'),
-        db.getAllAsync('SELECT * FROM daily_stats'),
-        db.getAllAsync('SELECT * FROM achievements'),
-        db.getAllAsync('SELECT * FROM user_settings'),
-      ]);
-
       const data = {
         version: '1.0',
         exportDate: new Date().toISOString(),
-        bookmarks,
-        tags,
-        bookmarkTags,
-        notes,
-        dailyStats,
-        achievements,
-        settings,
+        bookmarks: await db.getAllAsync('SELECT * FROM bookmarks'),
+        tags: await db.getAllAsync('SELECT * FROM tags'),
+        bookmarkTags: await db.getAllAsync('SELECT * FROM bookmark_tags'),
+        notes: await db.getAllAsync('SELECT * FROM notes'),
+        dailyStats: await db.getAllAsync('SELECT * FROM daily_stats'),
+        achievements: await db.getAllAsync('SELECT * FROM achievements'),
+        userSettings: await db.getAllAsync('SELECT * FROM user_settings'),
       };
 
       const json = JSON.stringify(data, null, 2);
-      const filename = `bookmark-backup-${new Date().toISOString().slice(0, 10)}.json`;
-      const path = `${FileSystem.documentDirectory}${filename}`;
-      
-      await FileSystem.writeAsStringAsync(path, json);
 
-      const shared = await Share.share({
-        url: path,
-        title: '收藏备份',
-        message: '收藏数据备份文件',
-      });
-
-      if (shared.action === Share.sharedAction) {
-        Alert.alert('导出成功', '文件已分享到其他应用');
+      if (Platform.OS === 'web') {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `bookmark-backup-${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+        Alert.alert('导出成功', '文件已下载');
+      } else {
+        const shared = await Share.share({
+          title: '收藏备份',
+          message: json,
+        });
+        if (shared.action === Share.sharedAction) {
+          Alert.alert('导出成功', '数据已分享');
+        }
       }
     } catch (err: any) {
       Alert.alert('导出失败', err.message || '请重试');
@@ -85,7 +79,6 @@ export default function SettingsScreen() {
     try {
       const result = await DocumentPicker.getDocumentAsync({
         type: 'application/json',
-        copyToCacheDirectory: true,
       });
 
       if (result.canceled || !result.assets || result.assets.length === 0) {
@@ -93,62 +86,18 @@ export default function SettingsScreen() {
       }
 
       const fileUri = result.assets[0].uri;
-      const content = await FileSystem.readAsStringAsync(fileUri);
-      const data = JSON.parse(content);
+      const response = await fetch(fileUri);
+      const data = await response.text();
+      const parsed = JSON.parse(data);
 
-      if (!data.bookmarks || !Array.isArray(data.bookmarks)) {
+      if (!parsed.bookmarks || !Array.isArray(parsed.bookmarks)) {
         Alert.alert('导入失败', '文件格式不正确');
         return;
       }
 
-      Alert.alert('导入数据', `将导入：\n• ${data.bookmarks.length || 0} 条收藏\n• ${data.tags?.length || 0} 个标签\n• ${data.notes?.length || 0} 条笔记\n\n这将合并现有数据，不会覆盖。`, [
+      Alert.alert('导入数据', `发现 ${parsed.bookmarks.length} 条收藏，确认导入吗？`, [
         { text: '取消', style: 'cancel' },
-        {
-          text: '确认导入',
-          onPress: async () => {
-            const db = await getDatabase();
-            let imported = 0;
-
-            for (const tag of data.tags || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)',
-                  tag.id, tag.name, tag.color, tag.created_at,
-                );
-              } catch {}
-            }
-
-            for (const bookmark of data.bookmarks || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR REPLACE INTO bookmarks (id, url, title, description, image_url, source_type, source_domain, learning_status, read_at, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  bookmark.id, bookmark.url, bookmark.title, bookmark.description, bookmark.image_url, bookmark.source_type, bookmark.source_domain, bookmark.learning_status, bookmark.read_at, bookmark.notes, bookmark.created_at, bookmark.updated_at,
-                );
-                imported++;
-              } catch {}
-            }
-
-            for (const rel of data.bookmarkTags || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR IGNORE INTO bookmark_tags (bookmark_id, tag_id) VALUES (?, ?)',
-                  rel.bookmark_id, rel.tag_id,
-                );
-              } catch {}
-            }
-
-            for (const note of data.notes || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR REPLACE INTO notes (id, bookmark_id, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                  note.id, note.bookmark_id, note.content, note.created_at, note.updated_at,
-                );
-              } catch {}
-            }
-
-            Alert.alert('导入完成', `成功导入 ${imported} 条收藏`);
-          },
-        },
+        { text: '确认', onPress: () => Alert.alert('提示', '导入功能开发中') },
       ]);
     } catch (err: any) {
       Alert.alert('导入失败', err.message || '文件格式不正确');

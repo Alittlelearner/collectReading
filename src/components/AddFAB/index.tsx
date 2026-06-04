@@ -19,7 +19,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
+    bottom: 76,
     width: 56,
     height: 56,
     borderRadius: 28,
@@ -31,6 +31,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 8,
     elevation: 8,
+    zIndex: 1000,
   },
   icon: {
     color: colors.white,

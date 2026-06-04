@@ -33,7 +33,7 @@ export class ReminderService {
     const daysMs = config.intervalDays * 86400000;
     const cutoffTime = Date.now() - daysMs;
 
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync(
       `SELECT * FROM bookmarks 
        WHERE learning_status = 'unread' 
          AND created_at < ?

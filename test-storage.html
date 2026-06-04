@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>测试数据库操作</title>
+  <style>
+    body { padding: 20px; font-family: Arial; }
+    .test { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+    .pass { background: #d4edda; }
+    .fail { background: #f8d7da; }
+    button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>学习收藏夹 - 数据库操作测试</h1>
+  
+  <div class="test pass">
+    <h3>测试 1: 添加测试书签</h3>
+    <button onclick="test1()">运行测试</button>
+    <pre id="result1"></pre>
+  </div>
+  
+  <div class="test pass">
+    <h3>测试 2: 模拟 markResurfaceDone (设置为 archived)</h3>
+    <button onclick="test2()">运行测试</button>
+    <pre id="result2"></pre>
+  </div>
+  
+  <div class="test pass">
+    <h3>测试 3: 查询验证 (archived 不应出现在结果中)</h3>
+    <button onclick="test3()">运行测试</button>
+    <pre id="result3"></pre>
+  </div>
+  
+  <div class="test pass">
+    <h3>测试 4: 测试跳过 (增加 resurface_count)</h3>
+    <button onclick="test4()">运行测试</button>
+    <pre id="result4"></pre>
+  </div>
+  
+  <div class="test fail">
+    <h3>清理：删除测试数据</h3>
+    <button onclick="cleanup()">清理</button>
+  </div>
+
+  <div class="test">
+    <h3>当前 localStorage 数据:</h3>
+    <pre id="current-data" style="max-height: 300px; overflow: auto;"></pre>
+    <button onclick="showData()">刷新</button>
+  </div>
+
+  <script>
+    const DB_KEY = 'bookmark-tracker-db-v1';
+    
+    function getData() {
+      const data = localStorage.getItem(DB_KEY);
+      return data ? JSON.parse(data) : null;
+    }
+    
+    function saveData(data) {
+      localStorage.setItem(DB_KEY, JSON.stringify(data));
+    }
+    
+    function showData() {
+      const data = getData();
+      document.getElementById('current-data').textContent = data ? 
+        JSON.stringify(data, null, 2) : 'No data';
+    }
+    
+    function test1() {
+      const id = 'test-' + Date.now();
+      const data = getData() || { bookmarks: {}, tags: {}, notes: {} };
+      data.bookmarks[id] = {
+        id: id,
+        url: 'https://test-' + id + '.com',
+        title: '测试书签 ' + id,
+        source_type: 'website',
+        source_domain: 'test.com',
+        learning_status: 'unread',
+        created_at: Date.now(),
+        updated_at: Date.now()
+      };
+      saveData(data);
+      document.getElementById('result1').textContent = '✅ 已创建书签: ' + id + ', 状态: unread';
+      showData();
+    }
+    
+    function test2() {
+      const data = getData();
+      if (!data || Object.keys(data.bookmarks).length === 0) {
+        document.getElementById('result2').textContent = '❌ 没有书签数据，请先运行测试 1';
+        return;
+      }
+      
+      const firstId = Object.keys(data.bookmarks)[0];
+      const now = Date.now();
+      
+      // 模拟 _handleUpdate
+      const bookmark = data.bookmarks[firstId];
+      bookmark.learning_status = 'archived';
+      bookmark.read_at = now;
+      bookmark.updated_at = now;
+      
+      saveData(data);
+      document.getElementById('result2').textContent = 
+        '✅ 已更新书签 ' + firstId + '\n新状态：' + bookmark.learning_status;
+      showData();
+    }
+    
+    function test3() {
+      const data = getData();
+      if (!data) {
+        document.getElementById('result3').textContent = '❌ 没有数据';
+        return;
+      }
+      
+      // 模拟查询：WHERE learning_status = 'unread'
+      const unreadBookmarks = Object.values(data.bookmarks).filter(
+        b => b.learning_status === 'unread'
+      );
+      
+      if (unreadBookmarks.length === 0) {
+        document.getElementById('result3').textContent = '✅ 查询结果为空 (正确！archived 不应出现)';
+      } else {
+        document.getElementById('result3').textContent = 
+          '❌ 查询返回 ' + unreadBookmarks.length + ' 条记录\n' +
+          JSON.stringify(unreadBookmarks.map(b => ({ id: b.id, status: b.learning_status })), null, 2);
+      }
+      showData();
+    }
+    
+    function test4() {
+      const data = getData();
+      if (!data || Object.keys(data.bookmarks).length === 0) {
+        document.getElementById('result4').textContent = '❌ 没有书签数据';
+        return;
+      }
+      
+      const firstId = Object.keys(data.bookmarks)[0];
+      const now = Date.now();
+      const bookmark = data.bookmarks[firstId];
+      
+      // 模拟 skip: 增加 resurface_count
+      bookmark.last_resurfaced_at = now;
+      bookmark.resurface_count = (bookmark.resurface_count || 0) + 1;
+      bookmark.updated_at = now;
+      
+      saveData(data);
+      document.getElementById('result4').textContent = 
+        '✅ skip 完成\nresurface_count: ' + bookmark.resurface_count + 
+        '\nlearning_status: ' + bookmark.learning_status;
+      showData();
+    }
+    
+    function cleanup() {
+      const data = getData();
+      if (data) {
+        Object.keys(data.bookmarks).forEach(id => {
+          if (id.startsWith('test-')) {
+            delete data.bookmarks[id];
+          }
+        });
+        saveData(data);
+        alert('已清理测试数据');
+        showData();
+      }
+    }
+    
+    // 初始加载
+    showData();
+  </script>
+</body>
+</html>

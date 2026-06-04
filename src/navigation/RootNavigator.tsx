@@ -16,6 +16,9 @@ import StatsDashboardScreen from '../screens/StatsDashboardScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AchievementsScreen from '../screens/AchievementsScreen';
+import TestAddBookmarkScreen from '../screens/TestAddBookmarkScreen';
+import SimpleTestScreen from '../screens/SimpleTestScreen';
+import MultiUrlTestScreen from '../screens/MultiUrlTestScreen';
 
 const Tab = createBottomTabNavigator<RootTabParamList>();
 const HomeStack = createNativeStackNavigator<HomeStackParamList>();
@@ -60,6 +63,21 @@ function HomeStackNavigator() {
         name="StatsDashboard"
         component={StatsDashboardScreen}
         options={{ title: '统计' }}
+      />
+      <HomeStack.Screen
+        name="TestAddBookmark"
+        component={TestAddBookmarkScreen}
+        options={{ title: '测试添加收藏' }}
+      />
+      <HomeStack.Screen
+        name="SimpleTest"
+        component={SimpleTestScreen}
+        options={{ title: '简单存储测试' }}
+      />
+      <HomeStack.Screen
+        name="MultiUrlTest"
+        component={MultiUrlTestScreen}
+        options={{ title: '多URL测试' }}
       />
     </HomeStack.Navigator>
   );

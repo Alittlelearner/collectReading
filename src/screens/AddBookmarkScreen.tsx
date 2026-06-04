@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import URLInput from '../components/URLInput';
 import { useBookmarks } from '../hooks/useBookmarks';
@@ -22,6 +22,29 @@ export default function AddBookmarkScreen() {
   const [error, setError] = useState('');
   const [parsedTitle, setParsedTitle] = useState('');
   const [parsedSource, setParsedSource] = useState('');
+
+  // 页面打开时重置状态
+  useEffect(() => {
+    setUrl('');
+    setNotes('');
+    setSelectedTags([]);
+    setParsedTitle('');
+    setParsedSource('');
+    setError('');
+    setLoading(false);
+  }, []);
+
+  const handleUrlChange = async (newUrl: string) => {
+    setUrl(newUrl);
+    if (!newUrl.trim()) {
+      setParsedTitle('');
+      setParsedSource('');
+      return;
+    }
+    // URL 变化时重置解析状态
+    setParsedTitle('');
+    setParsedSource('');
+  };
 
   const handleAdd = async () => {
     if (!url.trim()) {
@@ -49,6 +72,7 @@ export default function AddBookmarkScreen() {
         notes: notes.trim(),
       });
 
+      setLoading(false);
       navigation.goBack();
     } catch (err: any) {
       if (err.message === 'DUPLICATE_URL') {
@@ -69,7 +93,19 @@ export default function AddBookmarkScreen() {
   const [newTagName, setNewTagName] = useState('');
 
   const handleCreateTag = async () => {
-    if (!newTagName.trim()) return;
+    if (!newTagName.trim()) {
+      Alert.alert('提示', '请输入标签名称');
+      return;
+    }
+    
+    // 检查是否已存在
+    const exists = tags.tags.some(t => t.name.toLowerCase() === newTagName.trim().toLowerCase());
+    if (exists) {
+      Alert.alert('提示', '该标签已存在，请直接选择');
+      setNewTagName('');
+      return;
+    }
+    
     await tags.createTag(newTagName.trim());
     setNewTagName('');
   };
@@ -78,11 +114,14 @@ export default function AddBookmarkScreen() {
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.form}>
         <Text style={styles.label}>链接</Text>
-        <URLInput value={url} onChangeText={setUrl} loading={loading} error={error} />
+        <URLInput value={url} onChangeText={handleUrlChange} loading={loading} error={error} />
 
         <Text style={styles.label}>标签</Text>
+        {!!tags.tags && tags.tags.length === 0 ? (
+          <Text style={styles.emptyTagTip}>暂无标签，可输入标签名称创建</Text>
+        ) : null}
         <View style={styles.tagRow}>
-          {tags.tags.map((tag) => (
+          {!!tags.tags && tags.tags.map((tag) => (
             <TouchableOpacity
               key={tag.id}
               style={[
@@ -161,6 +200,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  emptyTagTip: {
+    color: colors.textMuted,
+    fontSize: 13,
+    fontStyle: 'italic',
+    marginBottom: spacing.sm,
   },
   tagChip: {
     paddingHorizontal: spacing.md,

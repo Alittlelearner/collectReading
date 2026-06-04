@@ -1,6 +1,6 @@
 export type SourceType = 'bilibili' | 'zhihu' | 'wechat' | 'ebook' | 'website' | 'metasearch' | 'other';
 
-export type LearningStatus = 'unread' | 'read';
+export type LearningStatus = 'unread' | 'read' | 'archived';
 
 export interface Bookmark {
   id: string;

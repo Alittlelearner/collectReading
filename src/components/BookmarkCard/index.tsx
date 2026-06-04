@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Linking, Platform } from 'react-native';
 import { Bookmark } from '../../types';
 import { colors } from '../../theme/colors';
 import { spacing, borderRadius } from '../../theme/spacing';
@@ -7,19 +7,31 @@ import { spacing, borderRadius } from '../../theme/spacing';
 interface BookmarkCardProps {
   bookmark: Bookmark;
   onPress?: () => void;
+  onLongPress?: () => void;
 }
 
-export default function BookmarkCard({ bookmark, onPress }: BookmarkCardProps) {
+export default function BookmarkCard({ bookmark, onPress, onLongPress }: BookmarkCardProps) {
   const sourceLabel = getSourceLabel(bookmark.sourceType);
   const sourceColor = colors.sourceColors[bookmark.sourceType] || colors.sourceColors.other;
   const isRead = bookmark.learningStatus === 'read';
 
+  const handleOpenLink = () => {
+    if (Platform.OS === 'web') {
+      window.open(bookmark.url, '_blank', 'noopener,noreferrer');
+    } else {
+      Linking.openURL(bookmark.url);
+    }
+  };
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
+    <TouchableOpacity style={styles.card} onPress={onPress} onLongPress={onLongPress} activeOpacity={0.7}>
       <View style={styles.header}>
         <View style={[styles.sourceBadge, { backgroundColor: sourceColor + '20' }]}>
           <Text style={[styles.sourceText, { color: sourceColor }]}>{sourceLabel}</Text>
         </View>
+        <TouchableOpacity style={styles.openLinkBtn} onPress={handleOpenLink} activeOpacity={0.7}>
+          <Text style={styles.openLinkText}>🔗 打开</Text>
+        </TouchableOpacity>
         <View style={[styles.statusDot, { backgroundColor: isRead ? colors.success : colors.textMuted }]} />
       </View>
 
@@ -96,6 +108,17 @@ const styles = StyleSheet.create({
   },
   sourceText: {
     fontSize: 11,
+    fontWeight: '600',
+  },
+  openLinkBtn: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary + '20',
+  },
+  openLinkText: {
+    fontSize: 11,
+    color: colors.primary,
     fontWeight: '600',
   },
   statusDot: {

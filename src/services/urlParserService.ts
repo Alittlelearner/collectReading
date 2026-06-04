@@ -10,6 +10,7 @@ import { SspaiExtractor } from './extractors/sspaiExtractor';
 import { MediumExtractor } from './extractors/mediumExtractor';
 import { GitHubExtractor } from './extractors/githubExtractor';
 import { XiaohongshuExtractor } from './extractors/xiaohongshuExtractor';
+import { expandShortUrl } from '../utils/urlExpander';
 
 const registry = new ExtractorRegistry();
 // 按优先级注册：特定平台优先，通用回退最后
@@ -26,19 +27,26 @@ registry.register(new GenericExtractor()); // 最低优先级兜底
 
 export class URLParserService {
   async parse(url: string): Promise<ExtractedMetadata> {
-    const extractor = registry.resolve(url);
-    const sourceDomain = this.detectSourceDomain(url);
+    let finalUrl = url;
+    try {
+      finalUrl = await expandShortUrl(url);
+    } catch (e) {
+      console.log('[URLParser] Failed to expand URL:', e);
+    }
+
+    const extractor = registry.resolve(finalUrl);
+    const sourceDomain = this.detectSourceDomain(finalUrl);
     let html = '';
 
     if (extractor.needsHTML) {
       try {
-        html = await this.fetchHTML(url);
-      } catch {
-        // HTML 抓取失败，使用空字符串传递给提取器
+        html = await this.fetchHTML(finalUrl);
+      } catch (e) {
+        console.log('[URLParser] Failed to fetch HTML:', e);
       }
     }
 
-    const metadata = await extractor.extract(url, html);
+    const metadata = await extractor.extract(finalUrl, html);
 
     return {
       ...metadata,
@@ -59,12 +67,23 @@ export class URLParserService {
   }
 
   private async fetchHTML(url: string): Promise<string> {
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(5000),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; BookmarkTracker/1.0)',
-      },
-    });
-    return response.text();
+    // 使用 Jina AI 的免费抓取服务
+    const jinaUrl = `https://r.jina.ai/http://${url.replace(/^https?:\/\//, '')}`;
+
+    try {
+      const response = await fetch(jinaUrl, {
+        signal: AbortSignal.timeout(15000),
+        headers: {
+          'Accept': 'text/plain',
+        },
+      });
+      if (response.ok) {
+        return await response.text();
+      }
+    } catch (e) {
+      console.log('[URLParser] Jina fetch failed:', e);
+    }
+
+    throw new Error('Failed to fetch HTML');
   }
 }

@@ -5,7 +5,7 @@ import { Note } from '../types';
 export class NoteService {
   async getByBookmark(bookmarkId: string): Promise<Note[]> {
     const db = await getDatabase();
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync(
       'SELECT * FROM notes WHERE bookmark_id = ? ORDER BY updated_at DESC',
       bookmarkId,
     );

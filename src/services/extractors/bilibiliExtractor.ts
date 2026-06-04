@@ -1,38 +1,60 @@
 import { Extractor, ExtractedMetadata, SourceType } from './types';
 
 export class BilibiliExtractor implements Extractor {
-  readonly pattern = /bilibili\.com\/video\//;
+  readonly pattern = /bilibili\.com|b23\.tv/;
   readonly sourceType: SourceType = 'bilibili';
-  readonly needsHTML = false;
+  readonly needsHTML = true;
 
-  async extract(url: string, _html: string): Promise<ExtractedMetadata> {
+  async extract(url: string, html: string): Promise<ExtractedMetadata> {
     const sourceDomain = new URL(url).hostname;
 
-    try {
-      const bvid = this.extractBVID(url);
-      if (!bvid) return this.emptyResult(url, sourceDomain);
-
-      const response = await fetch(
-        `https://api.bilibili.com/x/web-interface/view?bvid=${bvid}`,
-        { signal: AbortSignal.timeout(5000) },
-      );
-      const json = await response.json();
-
-      if (json.code !== 0 || !json.data) {
-        return this.emptyResult(url, sourceDomain);
+    // 从 HTML 中提取标题
+    if (html && html.length > 100) {
+      // 方法1: 从 <title> 标签提取
+      const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
+      if (titleMatch) {
+        let title = titleMatch[1].trim();
+        title = title.replace(/\s*_哔哩哔哩\s*$/, '').trim();
+        if (title) {
+          return {
+            title,
+            description: '',
+            imageUrl: null,
+            author: null,
+            sourceType: 'bilibili',
+            sourceDomain,
+          };
+        }
       }
 
+      // 方法2: 从 og:title meta 标签提取
+      const ogTitleMatch = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+      if (ogTitleMatch) {
+        return {
+          title: ogTitleMatch[1].trim(),
+          description: '',
+          imageUrl: null,
+          author: null,
+          sourceType: 'bilibili',
+          sourceDomain,
+        };
+      }
+    }
+
+    // 无法获取标题，使用 URL 中的信息
+    const bvid = this.extractBVID(url);
+    if (bvid) {
       return {
-        title: json.data.title || '',
-        description: json.data.desc || '',
-        imageUrl: json.data.pic || null,
-        author: json.data.owner?.name || null,
+        title: `B站视频 ${bvid}`,
+        description: '',
+        imageUrl: null,
+        author: null,
         sourceType: 'bilibili',
         sourceDomain,
       };
-    } catch {
-      return this.emptyResult(url, sourceDomain);
     }
+
+    return this.emptyResult(url, sourceDomain);
   }
 
   private extractBVID(url: string): string | null {

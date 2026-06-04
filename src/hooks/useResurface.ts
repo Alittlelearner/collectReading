@@ -1,23 +1,21 @@
-import { useCallback, useEffect } from 'react';
 import { useResurfaceStore } from '../store/resurfaceStore';
 
 export function useResurface() {
-  const store = useResurfaceStore();
-
-  useEffect(() => {
-    store.loadCandidates();
-  }, []);
-
-  const refresh = useCallback(() => {
-    store.loadCandidates();
-  }, []);
+  const { 
+    candidates, 
+    currentIndex, 
+    loading, 
+    loadCandidates, 
+    skip, 
+    done 
+  } = useResurfaceStore();
 
   return {
-    candidates: store.candidates,
-    currentIndex: store.currentIndex,
-    loading: store.loading,
-    skip: store.skip,
-    done: store.done,
-    refresh,
+    candidates,
+    currentIndex,
+    loading,
+    skip,
+    done,
+    refresh: loadCandidates,
   };
 }

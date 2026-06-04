@@ -14,7 +14,7 @@ export default function EmptyState({ icon = '📭', title, subtitle }: EmptyStat
     <View style={styles.container}>
       <Text style={styles.icon}>{icon}</Text>
       <Text style={styles.title}>{title}</Text>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      {!!subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
     </View>
   );
 }

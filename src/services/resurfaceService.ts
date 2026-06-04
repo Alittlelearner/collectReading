@@ -6,7 +6,7 @@ export class ResurfaceService {
     const db = await getDatabase();
     const sevenDaysAgo = Date.now() - 7 * 86400000;
 
-    const rows = await db.getAllAsync<any>(
+    const rows = await db.getAllAsync(
       `SELECT * FROM bookmarks
        WHERE learning_status = 'unread'
          AND resurface_count < ?
@@ -48,7 +48,7 @@ export class ResurfaceService {
     const now = Date.now();
     await db.runAsync(
       `UPDATE bookmarks
-       SET learning_status = 'read', read_at = ?, last_resurfaced_at = ?, updated_at = ?
+       SET learning_status = 'archived', read_at = ?, last_resurfaced_at = ?, updated_at = ?
        WHERE id = ?`,
       now,
       now,
