@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, FlatList, StyleSheet, SafeAreaView } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAchievements } from '../hooks/useAchievements';
 import { Achievement } from '../types';
 import { colors } from '../theme/colors';
@@ -15,19 +16,21 @@ function AchievementCard({ achievement }: AchievementCardProps) {
   return (
     <View style={[styles.card, !isUnlocked && styles.cardLocked]}>
       <View style={[styles.iconBox, !isUnlocked && styles.iconBoxLocked]}>
-        <Text style={styles.icon}>{isUnlocked ? '🏆' : '🔒'}</Text>
+        <MaterialCommunityIcons
+          name={isUnlocked ? 'trophy-variant-outline' : 'lock-outline'}
+          size={26}
+          color={isUnlocked ? colors.primary : colors.textMuted}
+        />
       </View>
       <View style={styles.content}>
-        <Text style={[styles.title, !isUnlocked && styles.titleLocked]}>
-          {achievement.title}
-        </Text>
+        <Text style={[styles.title, !isUnlocked && styles.titleLocked]}>{achievement.title}</Text>
         <Text style={[styles.description, !isUnlocked && styles.descriptionLocked]}>
           {achievement.description}
         </Text>
-        {isUnlocked && achievement.unlockedAt && (
-          <Text style={styles.unlockedDate}>
-            {formatDate(achievement.unlockedAt)}
-          </Text>
+        {isUnlocked && achievement.unlockedAt ? (
+          <Text style={styles.unlockedDate}>{formatDate(achievement.unlockedAt)}</Text>
+        ) : (
+          <Text style={styles.lockedHint}>继续阅读解锁这枚成就</Text>
         )}
       </View>
     </View>
@@ -42,7 +45,7 @@ export default function AchievementsScreen() {
     const all = achievements.achievements;
     const unlocked = all.filter((a) => a.unlockedAt);
     const locked = all.filter((a) => !a.unlockedAt);
-    
+
     unlocked.sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0));
     setSorted([...unlocked, ...locked]);
   }, [achievements.achievements]);
@@ -54,7 +57,8 @@ export default function AchievementsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>成就徽章</Text>
+        <Text style={styles.headerEyebrow}>里程碑</Text>
+        <Text style={styles.headerTitle}>成就</Text>
       </View>
 
       <FlatList
@@ -70,7 +74,9 @@ export default function AchievementsScreen() {
 
 function formatDate(timestamp: number): string {
   const date = new Date(timestamp);
-  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`;
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(
+    date.getDate(),
+  ).padStart(2, '0')}`;
 }
 
 const styles = StyleSheet.create({
@@ -82,10 +88,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  headerEyebrow: {
+    color: colors.textMuted,
+    fontSize: 12,
+    letterSpacing: 1,
+  },
   headerTitle: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 30,
+    fontWeight: '800',
+    marginTop: 2,
   },
   list: {
     padding: spacing.lg,
@@ -97,23 +109,22 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
     gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   cardLocked: {
-    opacity: 0.5,
+    opacity: 0.7,
   },
   iconBox: {
     width: 56,
     height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary + '20',
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.backgroundMuted,
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBoxLocked: {
     backgroundColor: colors.surfaceLight,
-  },
-  icon: {
-    fontSize: 28,
   },
   content: {
     flex: 1,
@@ -121,11 +132,11 @@ const styles = StyleSheet.create({
   title: {
     color: colors.text,
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: 4,
   },
   titleLocked: {
-    color: colors.textMuted,
+    color: colors.textSecondary,
   },
   description: {
     color: colors.textSecondary,
@@ -139,6 +150,10 @@ const styles = StyleSheet.create({
   unlockedDate: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
+  },
+  lockedHint: {
+    color: colors.textMuted,
+    fontSize: 12,
   },
 });

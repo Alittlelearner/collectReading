@@ -1,4 +1,5 @@
 import { getDatabase } from './database';
+import { enableWebBackupSync, restoreFromWebBackupIfNeeded } from './webPersistence';
 
 export async function runMigrations(): Promise<void> {
   const db = await getDatabase();
@@ -32,6 +33,30 @@ export async function runMigrations(): Promise<void> {
       PRIMARY KEY (bookmark_id, tag_id),
       FOREIGN KEY (bookmark_id) REFERENCES bookmarks(id) ON DELETE CASCADE,
       FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS folders (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS bookmark_folders (
+      bookmark_id TEXT NOT NULL,
+      folder_id TEXT NOT NULL,
+      PRIMARY KEY (bookmark_id, folder_id),
+      FOREIGN KEY (bookmark_id) REFERENCES bookmarks(id) ON DELETE CASCADE,
+      FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS wiki_spaces (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      description TEXT NOT NULL DEFAULT '',
+      grouping TEXT NOT NULL DEFAULT 'folder',
+      filter_json TEXT NOT NULL DEFAULT '{}',
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL
     );
 
     CREATE TABLE IF NOT EXISTS notes (
@@ -69,6 +94,32 @@ export async function runMigrations(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_bookmarks_created ON bookmarks(created_at);
     CREATE INDEX IF NOT EXISTS idx_bookmark_tags_bookmark ON bookmark_tags(bookmark_id);
     CREATE INDEX IF NOT EXISTS idx_bookmark_tags_tag ON bookmark_tags(tag_id);
+    CREATE INDEX IF NOT EXISTS idx_bookmark_folders_bookmark ON bookmark_folders(bookmark_id);
+    CREATE INDEX IF NOT EXISTS idx_bookmark_folders_folder ON bookmark_folders(folder_id);
+    CREATE INDEX IF NOT EXISTS idx_wiki_spaces_updated ON wiki_spaces(updated_at);
     CREATE INDEX IF NOT EXISTS idx_notes_bookmark ON notes(bookmark_id);
   `);
+
+  await addColumnIfMissing('bookmarks', 'description', "TEXT NOT NULL DEFAULT ''");
+  await addColumnIfMissing('bookmarks', 'image_url', 'TEXT');
+  await addColumnIfMissing('bookmarks', 'author', 'TEXT');
+  await addColumnIfMissing('bookmarks', 'original_tags', "TEXT NOT NULL DEFAULT '[]'");
+  await addColumnIfMissing('bookmarks', 'published_at', 'INTEGER');
+  await addColumnIfMissing('bookmarks', 'read_count', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('bookmarks', 'is_starred', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('bookmarks', 'is_archived', 'INTEGER NOT NULL DEFAULT 0');
+  await addColumnIfMissing('bookmarks', 'deleted_at', 'INTEGER');
+  await restoreFromWebBackupIfNeeded(db);
+  enableWebBackupSync();
+
+  async function addColumnIfMissing(
+    table: string,
+    column: string,
+    definition: string,
+  ): Promise<void> {
+    const columns = await db.getAllAsync<{ name: string }>(`PRAGMA table_info(${table})`);
+    if (!columns.some((item) => item.name === column)) {
+      await db.execAsync(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
+  }
 }

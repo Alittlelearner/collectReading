@@ -12,17 +12,27 @@ interface URLInputProps {
   autoFocus?: boolean;
 }
 
-export default function URLInput({ value, onChangeText, loading, error, autoFocus = true }: URLInputProps) {
+export default function URLInput({
+  value,
+  onChangeText,
+  loading,
+  error,
+  autoFocus = true,
+}: URLInputProps) {
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (!checked && !value) {
-      Clipboard.getStringAsync().then((text) => {
-        if (text && /^https?:\/\//.test(text.trim())) {
-          onChangeText(text.trim());
-        }
-        setChecked(true);
-      });
+      Clipboard.getStringAsync()
+        .then((text) => {
+          if (text && /^https?:\/\//.test(text.trim())) {
+            onChangeText(text.trim());
+          }
+        })
+        .catch(() => {
+          // Web browsers can deny clipboard reads unless the user explicitly grants access.
+        })
+        .finally(() => setChecked(true));
     }
   }, []);
 
@@ -32,7 +42,7 @@ export default function URLInput({ value, onChangeText, loading, error, autoFocu
     <View style={styles.container}>
       <TextInput
         style={[styles.input, !isValid && styles.inputError]}
-        placeholder="粘贴链接，自动识别标题和来源..."
+        placeholder="粘贴链接，自动识别标题、作者和简介..."
         placeholderTextColor={colors.textMuted}
         value={value}
         onChangeText={onChangeText}
@@ -43,17 +53,9 @@ export default function URLInput({ value, onChangeText, loading, error, autoFocu
         returnKeyType="done"
         editable={!loading}
       />
-      {loading && (
-        <ActivityIndicator
-          style={styles.loader}
-          color={colors.primary}
-          size="small"
-        />
-      )}
-      {error && <Text style={styles.error}>{error}</Text>}
-      {!isValid && value.length > 0 && (
-        <Text style={styles.error}>请输入有效链接</Text>
-      )}
+      {loading && <ActivityIndicator style={styles.loader} color={colors.primary} size="small" />}
+      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {!isValid && value.length > 0 ? <Text style={styles.error}>请输入有效链接</Text> : null}
     </View>
   );
 }
@@ -67,9 +69,9 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 16,
     padding: spacing.lg,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.surfaceLight,
+    borderColor: colors.border,
     paddingRight: 44,
   },
   inputError: {

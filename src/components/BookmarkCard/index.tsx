@@ -1,125 +1,242 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Bookmark } from '../../types';
 import { colors } from '../../theme/colors';
 import { spacing, borderRadius } from '../../theme/spacing';
+import { getSourceIcon, getSourceLabel } from '../../utils/sourceMeta';
+import { formatRelativeDate } from '../../utils/formatters';
+import { normalizeImageUrl } from '../../utils/media';
 
 interface BookmarkCardProps {
   bookmark: Bookmark;
   onPress?: () => void;
+  onToggleStar?: () => void;
 }
 
-export default function BookmarkCard({ bookmark, onPress }: BookmarkCardProps) {
-  const sourceLabel = getSourceLabel(bookmark.sourceType);
+const isWeb = Platform.OS === 'web';
+
+export default function BookmarkCard({ bookmark, onPress, onToggleStar }: BookmarkCardProps) {
   const sourceColor = colors.sourceColors[bookmark.sourceType] || colors.sourceColors.other;
   const isRead = bookmark.learningStatus === 'read';
+  const cover = normalizeImageUrl(bookmark.imageUrl);
 
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
-      <View style={styles.header}>
-        <View style={[styles.sourceBadge, { backgroundColor: sourceColor + '20' }]}>
-          <Text style={[styles.sourceText, { color: sourceColor }]}>{sourceLabel}</Text>
-        </View>
-        <View style={[styles.statusDot, { backgroundColor: isRead ? colors.success : colors.textMuted }]} />
-      </View>
-
-      <Text style={styles.title} numberOfLines={2}>
-        {bookmark.title || '(无标题)'}
-      </Text>
-
-      {bookmark.notes ? (
-        <Text style={styles.notes} numberOfLines={1}>
-          {bookmark.notes}
-        </Text>
-      ) : null}
-
-      <View style={styles.footer}>
-        <View style={styles.tags}>
-          {bookmark.tags.slice(0, 3).map((tag) => (
-            <View key={tag.id} style={[styles.tag, { backgroundColor: tag.color + '20' }]}>
-              <Text style={[styles.tagText, { color: tag.color }]}>{tag.name}</Text>
+    <TouchableOpacity style={[styles.card, isWeb && styles.cardWeb]} onPress={onPress} activeOpacity={0.9}>
+      {cover ? <Image source={{ uri: cover }} style={styles.cover} resizeMode="cover" /> : null}
+      <View style={styles.content}>
+        <View style={styles.topRow}>
+          <View
+            style={[
+              styles.sourceBadge,
+              { borderColor: `${sourceColor}55`, backgroundColor: `${sourceColor}12` },
+            ]}
+          >
+            <MaterialCommunityIcons name={getSourceIcon(bookmark.sourceType)} size={14} color={sourceColor} />
+            <Text style={[styles.sourceText, { color: sourceColor }]}>{getSourceLabel(bookmark.sourceType)}</Text>
+          </View>
+          <View style={styles.topActions}>
+            {onToggleStar ? (
+              <TouchableOpacity style={styles.iconBtn} onPress={onToggleStar}>
+                <MaterialCommunityIcons
+                  name={bookmark.isStarred ? 'star' : 'star-outline'}
+                  size={18}
+                  color={bookmark.isStarred ? '#b6925e' : colors.textMuted}
+                />
+              </TouchableOpacity>
+            ) : null}
+            <View style={[styles.statusPill, isRead ? styles.statusRead : styles.statusUnread]}>
+              <View
+                style={[styles.statusDot, { backgroundColor: isRead ? colors.success : colors.textMuted }]}
+              />
+              <Text style={[styles.statusText, { color: isRead ? colors.success : colors.textSecondary }]}>
+                {isRead ? '已读' : '未读'}
+              </Text>
             </View>
-          ))}
-          {bookmark.tags.length > 3 && (
-            <Text style={styles.moreTag}>+{bookmark.tags.length - 3}</Text>
-          )}
+          </View>
         </View>
-        <Text style={styles.date}>{formatDate(bookmark.createdAt)}</Text>
+
+        <Text style={styles.title} numberOfLines={2}>
+          {bookmark.title || '未命名内容'}
+        </Text>
+
+        {(bookmark.author || bookmark.description) && (
+          <View style={styles.body}>
+            {bookmark.author ? (
+              <Text style={styles.author} numberOfLines={1}>
+                {bookmark.author}
+              </Text>
+            ) : null}
+            {bookmark.description ? (
+              <Text style={styles.description} numberOfLines={isWeb ? 3 : 2}>
+                {bookmark.description}
+              </Text>
+            ) : null}
+          </View>
+        )}
+
+        {bookmark.notes ? (
+          <View style={styles.noteRibbon}>
+            <MaterialCommunityIcons name="pencil-box-outline" size={14} color={colors.primaryDark} />
+            <Text style={styles.noteText} numberOfLines={1}>
+              {bookmark.notes}
+            </Text>
+          </View>
+        ) : null}
+
+        <View style={styles.footer}>
+          <View style={styles.tags}>
+            {bookmark.tags.slice(0, 3).map((tag) => (
+              <View
+                key={tag.id}
+                style={[
+                  styles.tag,
+                  { backgroundColor: `${tag.color}18`, borderColor: `${tag.color}35` },
+                ]}
+              >
+                <Text style={[styles.tagText, { color: tag.color }]}>{tag.name}</Text>
+              </View>
+            ))}
+            {bookmark.tags.length > 3 ? <Text style={styles.moreTag}>+{bookmark.tags.length - 3}</Text> : null}
+          </View>
+
+          <View style={styles.metaGroup}>
+            <Text style={styles.metaText}>{formatRelativeDate(bookmark.createdAt)}</Text>
+            <Text style={styles.metaDivider}>·</Text>
+            <Text style={styles.metaText}>{bookmark.readCount} 次阅读</Text>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
 }
 
-function getSourceLabel(type: string): string {
-  const labels: Record<string, string> = {
-    bilibili: 'B站',
-    zhihu: '知乎',
-    wechat: '公众号',
-    ebook: '电子书',
-    website: '网站',
-    metasearch: '秘塔',
-    other: '其他',
-  };
-  return labels[type] || '其他';
-}
-
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / 86400000);
-
-  if (days === 0) return '今天';
-  if (days === 1) return '昨天';
-  if (days < 7) return `${days} 天前`;
-  return `${date.getMonth() + 1}/${date.getDate()}`;
-}
-
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
     marginHorizontal: spacing.lg,
     marginVertical: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
+    elevation: 3,
+    overflow: 'hidden',
   },
-  header: {
+  cardWeb: {
+    flexDirection: 'row',
+    minHeight: 176,
+  },
+  cover: {
+    width: isWeb ? 220 : '100%',
+    height: isWeb ? '100%' : 158,
+    backgroundColor: colors.backgroundMuted,
+  },
+  content: {
+    flex: 1,
+    padding: spacing.lg,
+  },
+  topRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  topActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: borderRadius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
   },
   sourceBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
     paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
   },
   sourceText: {
-    fontSize: 11,
-    fontWeight: '600',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  statusPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    borderRadius: borderRadius.full,
+  },
+  statusRead: {
+    backgroundColor: `${colors.success}18`,
+  },
+  statusUnread: {
+    backgroundColor: colors.backgroundMuted,
   },
   statusDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
   },
+  statusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
   title: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '500',
-    lineHeight: 22,
-    marginBottom: spacing.sm,
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 27,
   },
-  notes: {
+  body: {
+    marginTop: spacing.sm,
+  },
+  author: {
+    color: colors.primaryDark,
+    fontSize: 13,
+    fontWeight: '600',
+    marginBottom: spacing.xs,
+  },
+  description: {
     color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 21,
+  },
+  noteRibbon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.backgroundMuted,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.md,
+  },
+  noteText: {
+    flex: 1,
+    color: colors.primaryDark,
     fontSize: 13,
     lineHeight: 18,
-    marginBottom: spacing.sm,
   },
   footer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-end',
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   tags: {
     flexDirection: 'row',
@@ -129,20 +246,30 @@ const styles = StyleSheet.create({
   },
   tag: {
     paddingHorizontal: spacing.sm,
-    paddingVertical: 1,
-    borderRadius: borderRadius.sm,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
   },
   tagText: {
     fontSize: 11,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   moreTag: {
     color: colors.textMuted,
-    fontSize: 11,
+    fontSize: 12,
+    alignSelf: 'center',
   },
-  date: {
+  metaGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+  },
+  metaText: {
     color: colors.textMuted,
     fontSize: 12,
-    marginLeft: spacing.sm,
+  },
+  metaDivider: {
+    color: colors.textMuted,
+    fontSize: 12,
   },
 });

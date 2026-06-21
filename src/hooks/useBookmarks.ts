@@ -7,6 +7,7 @@ export function useBookmarks() {
 
   useEffect(() => {
     store.loadBookmarks();
+    store.loadSidebarStats();
   }, [store.filters]);
 
   const addBookmark = useCallback(
@@ -18,18 +19,25 @@ export function useBookmarks() {
 
   const refresh = useCallback(() => {
     store.loadBookmarks();
-  }, []);
+    store.loadSidebarStats();
+  }, [store]);
 
   return {
     bookmarks: store.bookmarks,
     filters: store.filters,
+    sidebarStats: store.sidebarStats,
     currentView: store.currentView,
     loading: store.loading,
     addBookmark,
     updateBookmark: store.updateBookmark,
     deleteBookmark: store.deleteBookmark,
+    restoreBookmark: store.restoreBookmark,
+    archiveBookmark: store.archiveBookmark,
+    unarchiveBookmark: store.unarchiveBookmark,
+    toggleStar: store.toggleStar,
     toggleStatus: store.toggleStatus,
     setFilters: store.setFilters,
+    replaceFilters: store.replaceFilters,
     setView: store.setView,
     getSourceGroups: store.getSourceGroups,
     refresh,

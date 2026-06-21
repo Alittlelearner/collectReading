@@ -1,20 +1,26 @@
-import { Extractor, ExtractedMetadata, SourceType } from './types';
+import { Extractor, ExtractedMetadata, ExtractorContext, SourceType } from './types';
 
 export class GenericExtractor implements Extractor {
+  readonly id = 'generic';
+  readonly displayName = '通用链接';
   readonly pattern = /./;
   readonly sourceType: SourceType = 'website';
   readonly needsHTML = true;
+  readonly priority = -100;
 
-  async extract(_url: string, html: string): Promise<ExtractedMetadata> {
-    const sourceDomain = this.extractDomain(_url);
+  async extract(url: string, context: ExtractorContext): Promise<ExtractedMetadata> {
+    const html = context.html || '';
+    const sourceDomain = context.sourceDomain || this.extractDomain(url);
 
     return {
-      title: this.extractTitle(html),
+      title: this.extractTitle(html) || sourceDomain || url,
       description: this.extractDescription(html),
       imageUrl: this.extractImage(html),
       author: this.extractAuthor(html),
       sourceType: this.inferSourceType(html, sourceDomain),
       sourceDomain,
+      originalTags: [],
+      publishedAt: null,
     };
   }
 
@@ -64,6 +70,8 @@ export class GenericExtractor implements Extractor {
     if (/mp\.weixin\.qq\.com/.test(domain)) return 'wechat';
     if (/weread\.qq\.com|duokan\.com|ireader\.com/.test(domain)) return 'ebook';
     if (/metaso\.com/.test(domain)) return 'metasearch';
+    if (/okjike\.com/.test(domain)) return 'jike';
+    if (/xueqiu\.com/.test(domain)) return 'xueqiu';
     if (/juejin\.cn/.test(domain)) return 'website';
     if (/douban\.com/.test(domain)) return 'other';
     if (/sspai\.com/.test(domain)) return 'website';

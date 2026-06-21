@@ -1,4 +1,5 @@
 import { getDatabase } from '../db/database';
+import { syncAchievements } from './achievementSyncService';
 import { generateId } from '../utils/uuid';
 import { Note } from '../types';
 
@@ -31,6 +32,7 @@ export class NoteService {
       now,
       now,
     );
+    await syncAchievements();
 
     return {
       id,

@@ -1,88 +1,131 @@
-import { Extractor, ExtractedMetadata, SourceType } from './types';
+import { Extractor, ExtractedMetadata, ExtractorContext, SourceType } from './types';
 
 export class DoubanExtractor implements Extractor {
+  readonly id = 'douban';
+  readonly displayName = '豆瓣';
   readonly pattern = /douban\.com\//;
   readonly sourceType: SourceType = 'other';
   readonly needsHTML = true;
+  readonly priority = 70;
 
-  async extract(url: string, html: string): Promise<ExtractedMetadata> {
-    const sourceDomain = new URL(url).hostname;
-    const subjectType = this.detectSubjectType(url);
+  async extract(url: string, context: ExtractorContext): Promise<ExtractedMetadata> {
+    const html = context.html || '';
+    const sourceDomain = context.sourceDomain;
+    const jsonLd = this.extractJsonLd(html);
 
     return {
-      title: this.extractTitle(html, subjectType),
+      title: this.extractTitle(html, jsonLd),
       description: this.extractDescription(html),
       imageUrl: this.extractImage(html),
-      author: this.extractAuthor(html, subjectType),
+      author: this.extractAuthor(html, jsonLd),
       sourceType: 'other',
       sourceDomain,
+      originalTags: this.extractTags(html, jsonLd),
+      publishedAt: this.extractPublishedAt(html),
     };
   }
 
-  private detectSubjectType(url: string): 'book' | 'movie' | 'music' | 'unknown' {
-    if (/douban\.com\/subject\/\d+/.test(url)) {
-      if (url.includes('/book/')) return 'book';
-      if (url.includes('/movie/')) return 'movie';
-      if (url.includes('/music/')) return 'music';
+  private extractTitle(html: string, jsonLd: any): string {
+    if (jsonLd?.name) {
+      return jsonLd.name;
     }
-    return 'unknown';
-  }
 
-  private extractTitle(html: string, subjectType: string): string {
     const ogTitle = this.extractMeta(html, 'og:title');
     if (ogTitle) return ogTitle;
 
-    // 豆瓣书籍/电影/音乐的特殊结构
-    if (subjectType !== 'unknown') {
-      const h1Match = html.match(/<h1[^>]*><span[^>]*property="v:itemreviewed"[^>]*>([^<]+)<\/span><\/h1>/i);
-      if (h1Match && h1Match[1]) return h1Match[1].trim();
-    }
-
-    const h1Match = html.match(/<h1[^>]*>([^<]+)<\/h1>/i);
-    if (h1Match) return h1Match[1].trim();
-
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch) return titleMatch[1].replace(/ - 豆瓣$/, '').trim();
-
-    return '';
+    return titleMatch ? titleMatch[1].replace(/\s*\(豆瓣\)\s*$/, '').trim() : '';
   }
 
   private extractDescription(html: string): string {
     const ogDesc = this.extractMeta(html, 'og:description');
     if (ogDesc) return ogDesc;
 
-    // 豆瓣内容简介
     const descMatch = html.match(/<meta[^>]+name="description"[^>]+content="([^"]+)"/i);
-    if (descMatch) return descMatch[1];
-
-    return '';
+    return descMatch ? descMatch[1] : '';
   }
 
   private extractImage(html: string): string | null {
     const ogImage = this.extractMeta(html, 'og:image');
     if (ogImage) return ogImage;
 
-    // 豆瓣封面图
-    const coverMatch = html.match(/<img[^>]+alt="[^"]*"[^>]+src="([^"]+\.jpg)"[^>]*>/i);
-    if (coverMatch) return coverMatch[1];
-
-    return null;
+    const coverMatch = html.match(/<img[^>]+src="([^"]+)"[^>]+rel="v:image"/i);
+    return coverMatch ? coverMatch[1] : null;
   }
 
-  private extractAuthor(html: string, subjectType: string): string | null {
-    if (subjectType === 'book') {
-      const authorMatch = html.match(/<span[^>]*class="pl">作者<\/span>[^>]*([^<]+)<\/a>/i);
-      if (authorMatch && authorMatch[1]) return authorMatch[1].trim();
-    }
-    if (subjectType === 'movie') {
-      const directorMatch = html.match(/<span[^>]*class="pl">导演<\/span>[^>]*([^<]+)<\/a>/i);
-      if (directorMatch && directorMatch[1]) return directorMatch[1].trim();
+  private extractAuthor(html: string, jsonLd: any): string | null {
+    if (Array.isArray(jsonLd?.author) && jsonLd.author.length > 0) {
+      return jsonLd.author
+        .map((item: any) => item?.name)
+        .filter((name: unknown): name is string => typeof name === 'string' && name.trim().length > 0)
+        .join(' / ');
     }
 
-    const metaAuthor = this.extractMeta(html, 'article:author');
-    if (metaAuthor) return metaAuthor;
+    const infoBlock = this.extractInfoValue(html, '作者');
+    if (infoBlock) {
+      return infoBlock;
+    }
 
-    return null;
+    return this.extractMeta(html, 'article:author');
+  }
+
+  private extractTags(html: string, jsonLd: any): string[] {
+    const tags = new Set<string>();
+
+    if (jsonLd?.['@type']) {
+      tags.add(String(jsonLd['@type']));
+    }
+
+    const title = this.extractTitle(html, jsonLd);
+    if (title) {
+      const suffixes = ['(豆瓣)'];
+      suffixes.forEach((suffix) => {
+        if (title.endsWith(suffix)) {
+          tags.add(suffix.replace(/[()]/g, ''));
+        }
+      });
+    }
+
+    return Array.from(tags);
+  }
+
+  private extractPublishedAt(html: string): number | null {
+    const raw = this.extractInfoValue(html, '出版年');
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = Date.parse(raw.replace(/\./g, '-'));
+    return Number.isNaN(parsed) ? null : parsed;
+  }
+
+  private extractInfoValue(html: string, label: string): string | null {
+    const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = html.match(
+      new RegExp(`<span[^>]*class="pl">\\s*${escaped}:<\\/span>\\s*([\\s\\S]*?)(?:<br\\/?|<span[^>]*class="pl">)`, 'i'),
+    );
+
+    if (!match?.[1]) {
+      return null;
+    }
+
+    return match[1]
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  private extractJsonLd(html: string): any | null {
+    const match = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
+    if (!match?.[1]) {
+      return null;
+    }
+
+    try {
+      return JSON.parse(match[1]);
+    } catch {
+      return null;
+    }
   }
 
   private extractMeta(html: string, property: string): string | null {

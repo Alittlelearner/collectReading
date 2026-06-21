@@ -1,2 +1,2 @@
-export { ExtractedMetadata, Extractor } from '../../types';
+export { ExtractedMetadata, Extractor, ExtractorContext } from '../../types';
 export type { SourceType } from '../../types';

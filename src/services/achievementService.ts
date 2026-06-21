@@ -14,7 +14,7 @@ const ACHIEVEMENT_RULES: Record<string, (ctx: AchievementContext) => boolean> = 
   streak_30: (ctx) => ctx.currentStreak >= 30,
   organizer: (ctx) => ctx.totalTags >= 5,
   note_taker: (ctx) => ctx.totalNotes >= 5,
-  resurrector: (ctx) => ctx.totalRead >= 10,
+  resurrector: (ctx) => ctx.totalResurfacedRead >= 10,
 };
 
 export class AchievementService {
@@ -70,12 +70,17 @@ export class AchievementService {
     const noteRow = await db.getFirstAsync<{ count: number }>(
       'SELECT COUNT(*) as count FROM notes',
     );
+    const resurfacedReadRow = await db.getFirstAsync<{ count: number }>(
+      'SELECT COUNT(*) as count FROM bookmarks WHERE learning_status = ? AND last_resurfaced_at IS NOT NULL',
+      'read',
+    );
 
     const streak = await this.calculateCurrentStreak();
 
     return {
       totalBookmarks: bookmarkRow?.count || 0,
       totalRead: readRow?.count || 0,
+      totalResurfacedRead: resurfacedReadRow?.count || 0,
       currentStreak: streak,
       totalTags: tagRow?.count || 0,
       totalNotes: noteRow?.count || 0,

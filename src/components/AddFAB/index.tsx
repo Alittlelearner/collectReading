@@ -1,7 +1,8 @@
 import React from 'react';
-import { TouchableOpacity, Text, StyleSheet } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
-import { spacing, borderRadius } from '../../theme/spacing';
+import { borderRadius } from '../../theme/spacing';
 
 interface AddFABProps {
   onPress: () => void;
@@ -9,8 +10,8 @@ interface AddFABProps {
 
 export default function AddFAB({ onPress }: AddFABProps) {
   return (
-    <TouchableOpacity style={styles.fab} onPress={onPress} activeOpacity={0.8}>
-      <Text style={styles.icon}>＋</Text>
+    <TouchableOpacity style={styles.fab} onPress={onPress} activeOpacity={0.9}>
+      <MaterialCommunityIcons name="book-plus-outline" size={26} color={colors.white} />
     </TouchableOpacity>
   );
 }
@@ -19,23 +20,17 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 20,
-    bottom: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: 24,
+    width: 60,
+    height: 60,
+    borderRadius: borderRadius.full,
     backgroundColor: colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
     elevation: 8,
-  },
-  icon: {
-    color: colors.white,
-    fontSize: 28,
-    fontWeight: '300',
-    lineHeight: 30,
   },
 });

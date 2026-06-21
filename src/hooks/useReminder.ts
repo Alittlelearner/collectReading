@@ -1,7 +1,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ReminderService } from '../services/reminderService';
+import { SettingsService } from '../services/settingsService';
 
 const service = new ReminderService();
+const settingsService = new SettingsService();
 
 interface ReminderConfig {
   enabled: boolean;
@@ -29,9 +31,10 @@ export function useReminder() {
   const loadConfig = async () => {
     try {
       const scheduled = await service.getAllScheduled();
+      const intervalValue = await settingsService.getValue('reminder_interval', '7');
       setConfig({
         enabled: scheduled.length > 0,
-        intervalDays: 7,
+        intervalDays: Number.parseInt(intervalValue, 10) || 7,
       });
     } catch {
       setConfig({ enabled: false, intervalDays: 7 });
@@ -62,6 +65,7 @@ export function useReminder() {
         intervalDays: updated.intervalDays,
         dailyLimit: 3,
       });
+      await settingsService.setValue('reminder_interval', String(updated.intervalDays));
 
       setConfig(updated);
       setLoading(false);

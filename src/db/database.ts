@@ -1,44 +1,38 @@
-// 数据库服务统一入口
-// 根据平台自动选择原生 SQLite 或 Web polyfill
+import type { SQLiteDatabase } from 'expo-sqlite';
+import { scheduleWebBackup } from './webPersistence';
 
-import { Platform } from 'react-native';
+export type AppDatabase = Pick<
+  SQLiteDatabase,
+  'runAsync' | 'getAllAsync' | 'getFirstAsync' | 'execAsync' | 'closeAsync'
+>;
 
-type Database = any;
+let db: AppDatabase | null = null;
 
-let db: Database | null = null;
-
-export async function getDatabase(): Promise<Database> {
+export async function getDatabase(): Promise<AppDatabase> {
   if (!db) {
-    if (Platform.OS === 'web') {
-      // Web 平台：使用 localStorage 模拟
-      db = {
-        async runAsync(sql: string, params?: any[]) {
-          console.log('[WebDB] runAsync:', sql);
-          return { changes: 0 };
-        },
-        async getAllAsync(sql: string): Promise<any[]> {
-          console.log('[WebDB] getAllAsync:', sql);
-          return [];
-        },
-        async getFirstAsync(sql: string): Promise<any> {
-          console.log('[WebDB] getFirstAsync:', sql);
-          return null;
-        },
-        async execAsync(sql: string) {
-          console.log('[WebDB] execAsync:', sql);
-        },
-      };
-    } else {
-      // 原生平台：使用 expo-sqlite
-      const SQLite = await import('expo-sqlite');
-      db = await SQLite.openDatabaseAsync('bookmarks.db');
-    }
+    const SQLite = await import('expo-sqlite');
+    const rawDb = await SQLite.openDatabaseAsync('bookmarks.db');
+    db = {
+      runAsync: async (...args: any[]) => {
+        const result = await (rawDb.runAsync as any)(...args);
+        scheduleWebBackup(db!);
+        return result;
+      },
+      execAsync: async (...args: any[]) => {
+        const result = await (rawDb.execAsync as any)(...args);
+        scheduleWebBackup(db!);
+        return result;
+      },
+      getAllAsync: rawDb.getAllAsync.bind(rawDb),
+      getFirstAsync: rawDb.getFirstAsync.bind(rawDb),
+      closeAsync: rawDb.closeAsync.bind(rawDb),
+    } as AppDatabase;
   }
-  return db;
+  return db!;
 }
 
 export async function closeDatabase(): Promise<void> {
-  if (db && Platform.OS !== 'web') {
+  if (db) {
     await db.closeAsync();
   }
   db = null;

@@ -11,6 +11,7 @@ import {
 import { Note } from '../../types';
 import { colors } from '../../theme/colors';
 import { spacing, borderRadius } from '../../theme/spacing';
+import { formatRelativeTime } from '../../utils/formatters';
 
 interface NotesListProps {
   notes: Note[];
@@ -77,9 +78,7 @@ export default function NotesList({ notes, loading, onAdd, onUpdate, onDelete }:
             {item.content}
           </Text>
           <View style={styles.noteMeta}>
-            <Text style={styles.noteDate}>
-              {formatDate(item.updatedAt)}
-            </Text>
+            <Text style={styles.noteDate}>{formatRelativeTime(item.updatedAt)}</Text>
             <View style={styles.noteActions}>
               <TouchableOpacity onPress={() => handleStartEdit(item)}>
                 <Text style={styles.editText}>编辑</Text>
@@ -99,25 +98,20 @@ export default function NotesList({ notes, loading, onAdd, onUpdate, onDelete }:
       <View style={styles.addSection}>
         <TextInput
           style={styles.addInput}
-          placeholder="写点笔记..."
+          placeholder="写下你的笔记、摘录或想法..."
           placeholderTextColor={colors.textMuted}
           value={newNote}
           onChangeText={setNewNote}
           multiline
-          numberOfLines={2}
+          numberOfLines={3}
         />
         <TouchableOpacity style={styles.addBtn} onPress={handleAdd} disabled={!newNote.trim()}>
-          <Text style={[styles.addBtnText, !newNote.trim() && styles.addBtnTextDisabled]}>
-            添加
-          </Text>
+          <Text style={[styles.addBtnText, !newNote.trim() && styles.addBtnTextDisabled]}>添加笔记</Text>
         </TouchableOpacity>
       </View>
 
-      {loading && <Text style={styles.loadingText}>加载中...</Text>}
-
-      {!loading && notes.length === 0 && (
-        <Text style={styles.emptyText}>暂无笔记</Text>
-      )}
+      {loading ? <Text style={styles.loadingText}>笔记加载中...</Text> : null}
+      {!loading && notes.length === 0 ? <Text style={styles.emptyText}>还没有笔记</Text> : null}
 
       <FlatList
         data={notes}
@@ -128,21 +122,6 @@ export default function NotesList({ notes, loading, onAdd, onUpdate, onDelete }:
       />
     </View>
   );
-}
-
-function formatDate(timestamp: number): string {
-  const date = new Date(timestamp);
-  const now = new Date();
-  const diff = now.getTime() - date.getTime();
-  const days = Math.floor(diff / 86400000);
-
-  if (days === 0) {
-    const hours = Math.floor(diff / 3600000);
-    if (hours === 0) return '刚刚';
-    return `${hours} 小时前`;
-  }
-  if (days < 7) return `${days} 天前`;
-  return `${date.getMonth() + 1}/${date.getDate()}`;
 }
 
 const styles = StyleSheet.create({
@@ -157,9 +136,11 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontSize: 14,
     padding: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     marginBottom: spacing.sm,
-    minHeight: 60,
+    minHeight: 88,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   addBtn: {
     alignSelf: 'flex-end',
@@ -171,7 +152,7 @@ const styles = StyleSheet.create({
   addBtnText: {
     color: colors.white,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   addBtnTextDisabled: {
     opacity: 0.5,
@@ -191,9 +172,11 @@ const styles = StyleSheet.create({
   },
   noteCard: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.lg,
     marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   noteContent: {
     color: colors.text,
@@ -217,21 +200,21 @@ const styles = StyleSheet.create({
   editText: {
     color: colors.primary,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   deleteText: {
     color: colors.error,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '700',
   },
   editInput: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.backgroundMuted,
     color: colors.text,
     fontSize: 14,
     padding: spacing.md,
     borderRadius: borderRadius.md,
     marginBottom: spacing.sm,
-    minHeight: 60,
+    minHeight: 72,
   },
   editActions: {
     flexDirection: 'row',
@@ -239,7 +222,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   cancelBtn: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.backgroundMuted,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.sm,
@@ -247,7 +230,7 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     color: colors.textSecondary,
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   saveBtn: {
     backgroundColor: colors.primary,
@@ -258,6 +241,6 @@ const styles = StyleSheet.create({
   saveBtnText: {
     color: colors.white,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

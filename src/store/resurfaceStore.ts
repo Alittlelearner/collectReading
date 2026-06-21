@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { Bookmark } from '../types';
 import { ResurfaceService } from '../services/resurfaceService';
 import { BookmarkService } from '../services/bookmarkService';
+import { useBookmarkStore } from './bookmarkStore';
+import { useStatsStore } from './statsStore';
 
 const resurfaceService = new ResurfaceService();
 const bookmarkService = new BookmarkService();
@@ -15,6 +17,7 @@ interface ResurfaceState {
   skip: () => Promise<void>;
   done: () => Promise<void>;
   nextCandidate: () => void;
+  refreshAfterAction: () => Promise<void>;
 }
 
 export const useResurfaceStore = create<ResurfaceState>((set, get) => ({
@@ -32,7 +35,7 @@ export const useResurfaceStore = create<ResurfaceState>((set, get) => ({
     const { candidates, currentIndex } = get();
     if (currentIndex < candidates.length) {
       await resurfaceService.markResurfaceSkipped(candidates[currentIndex].id);
-      set({ currentIndex: currentIndex + 1 });
+      await get().refreshAfterAction();
     }
   },
 
@@ -40,11 +43,18 @@ export const useResurfaceStore = create<ResurfaceState>((set, get) => ({
     const { candidates, currentIndex } = get();
     if (currentIndex < candidates.length) {
       await resurfaceService.markResurfaceDone(candidates[currentIndex].id);
-      set({ currentIndex: currentIndex + 1 });
+      await get().refreshAfterAction();
     }
   },
 
   nextCandidate: () => {
     set((state) => ({ currentIndex: state.currentIndex + 1 }));
+  },
+
+  refreshAfterAction: async () => {
+    await useBookmarkStore.getState().loadBookmarks();
+    await useStatsStore.getState().refresh();
+    const candidates = await resurfaceService.getResurfaceCandidates();
+    set({ candidates, currentIndex: 0 });
   },
 }));

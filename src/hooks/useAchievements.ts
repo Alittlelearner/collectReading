@@ -6,6 +6,7 @@ export function useAchievements() {
 
   useEffect(() => {
     store.loadAchievements();
+    store.checkAchievements();
   }, []);
 
   const check = useCallback(async () => {

@@ -1,6 +1,12 @@
 import React, { useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, Alert, StyleSheet,
+  Alert,
+  FlatList,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { useTags } from '../hooks/useTags';
 import { colors } from '../theme/colors';
@@ -19,7 +25,7 @@ export default function TagManageScreen() {
   };
 
   const handleDelete = (id: string, name: string) => {
-    Alert.alert('删除标签', `确定删除「${name}」？`, [
+    Alert.alert('删除标签', `确定删除“${name}”吗？`, [
       { text: '取消', style: 'cancel' },
       { text: '删除', style: 'destructive', onPress: () => tags.deleteTag(id) },
     ]);
@@ -67,7 +73,7 @@ export default function TagManageScreen() {
       <View style={styles.createRow}>
         <TextInput
           style={styles.createInput}
-          placeholder="新标签名称..."
+          placeholder="新标签名称"
           placeholderTextColor={colors.textMuted}
           value={newName}
           onChangeText={setNewName}
@@ -83,9 +89,7 @@ export default function TagManageScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderTag}
         contentContainerStyle={styles.list}
-        ListEmptyComponent={
-          <Text style={styles.emptyText}>暂无标签，创建一个吧</Text>
-        }
+        ListEmptyComponent={<Text style={styles.emptyText}>还没有标签，先创建一个吧。</Text>}
       />
     </View>
   );
@@ -105,31 +109,35 @@ const styles = StyleSheet.create({
     fontSize: 15,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   createBtn: {
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     justifyContent: 'center',
   },
-  createBtnText: { color: colors.white, fontSize: 14, fontWeight: '600' },
+  createBtnText: { color: colors.white, fontSize: 14, fontWeight: '700' },
   list: { paddingHorizontal: spacing.lg },
   tagRow: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
     padding: spacing.lg,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     marginBottom: spacing.sm,
     gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   tagDot: { width: 10, height: 10, borderRadius: 5 },
-  tagName: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '500' },
+  tagName: { flex: 1, color: colors.text, fontSize: 15, fontWeight: '600' },
   editInput: {
     flex: 1,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.backgroundMuted,
     color: colors.text,
     fontSize: 15,
     paddingHorizontal: spacing.sm,
@@ -137,6 +145,6 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   tagCount: { color: colors.textMuted, fontSize: 13 },
-  deleteText: { color: colors.error, fontSize: 13, fontWeight: '500' },
+  deleteText: { color: colors.error, fontSize: 13, fontWeight: '700' },
   emptyText: { color: colors.textMuted, textAlign: 'center', marginTop: 40, fontSize: 14 },
 });

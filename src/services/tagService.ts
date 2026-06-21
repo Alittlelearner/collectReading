@@ -1,4 +1,5 @@
 import { getDatabase } from '../db/database';
+import { syncAchievements } from './achievementSyncService';
 import { generateId } from '../utils/uuid';
 import { Tag } from '../types';
 
@@ -6,7 +7,12 @@ export class TagService {
   async getAll(): Promise<Tag[]> {
     const db = await getDatabase();
     const rows = await db.getAllAsync<any>(
-      `SELECT t.*, (SELECT COUNT(*) FROM bookmark_tags bt WHERE bt.tag_id = t.id) as bookmark_count
+      `SELECT t.*, (
+          SELECT COUNT(*)
+          FROM bookmark_tags bt
+          INNER JOIN bookmarks b ON b.id = bt.bookmark_id
+          WHERE bt.tag_id = t.id AND b.deleted_at IS NULL
+        ) as bookmark_count
        FROM tags t
        ORDER BY t.created_at DESC`,
     );
@@ -31,6 +37,7 @@ export class TagService {
       color,
       now,
     );
+    await syncAchievements();
 
     return {
       id,
@@ -92,7 +99,10 @@ export class TagService {
   private async mapRow(row: any): Promise<Tag> {
     const db = await getDatabase();
     const countRow = await db.getFirstAsync<{ count: number }>(
-      'SELECT COUNT(*) as count FROM bookmark_tags WHERE tag_id = ?',
+      `SELECT COUNT(*) as count
+       FROM bookmark_tags bt
+       INNER JOIN bookmarks b ON b.id = bt.bookmark_id
+       WHERE bt.tag_id = ? AND b.deleted_at IS NULL`,
       row.id,
     );
     return {

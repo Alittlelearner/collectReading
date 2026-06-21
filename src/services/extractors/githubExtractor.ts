@@ -1,14 +1,18 @@
-import { Extractor, ExtractedMetadata, SourceType } from './types';
+import { Extractor, ExtractedMetadata, ExtractorContext, SourceType } from './types';
+import { fetchWithTimeout } from '../network';
 
 export class GitHubExtractor implements Extractor {
+  readonly id = 'github';
+  readonly displayName = 'GitHub';
   readonly pattern = /github\.com\//;
   readonly sourceType: SourceType = 'website';
   readonly needsHTML = true;
+  readonly priority = 80;
 
-  async extract(url: string, html: string): Promise<ExtractedMetadata> {
-    const sourceDomain = new URL(url).hostname;
+  async extract(url: string, context: ExtractorContext): Promise<ExtractedMetadata> {
+    const html = context.html || '';
+    const sourceDomain = context.sourceDomain;
     const pageType = this.detectPageType(url);
-    const sourceType = pageType === 'repo' ? 'website' : 'website';
 
     switch (pageType) {
       case 'repo':
@@ -16,34 +20,61 @@ export class GitHubExtractor implements Extractor {
       case 'gist':
         return this.extractGist(url, html, sourceDomain);
       default:
-        return this.extractGeneric(url, html, sourceDomain);
+        return this.extractGeneric(html, sourceDomain);
     }
   }
 
-  private detectPageType(url: string): 'repo' | 'gist' | 'profile' | 'other' {
-    if (/github\.com\/[\w-]+\/[\w-]+$/.test(url)) return 'repo';
+  private detectPageType(url: string): 'repo' | 'gist' | 'other' {
+    if (/github\.com\/[\w.-]+\/[\w.-]+(?:\/)?(?:\?.*)?$/.test(url)) return 'repo';
     if (/gist\.github\.com\//.test(url)) return 'gist';
-    if (/github\.com\/[\w-]+(?:\/.*)?$/.test(url) && !url.includes('/')) return 'profile';
     return 'other';
   }
 
-  private extractRepo(url: string, html: string, sourceDomain: string): ExtractedMetadata {
+  private async extractRepo(url: string, html: string, sourceDomain: string): Promise<ExtractedMetadata> {
+    const parsed = this.extractRepoParts(url);
+
+    if (parsed) {
+      try {
+        const response = await fetchWithTimeout(
+          `https://api.github.com/repos/${parsed.owner}/${parsed.repo}`,
+          {
+            headers: {
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+            },
+          },
+          5000,
+        );
+
+        if (response.ok) {
+          const repo = await response.json();
+          return {
+            title: repo.full_name || `${parsed.owner}/${parsed.repo}`,
+            description: repo.description || '',
+            imageUrl: repo.owner?.avatar_url || `https://avatars.githubusercontent.com/${parsed.owner}`,
+            author: repo.owner?.login || parsed.owner,
+            sourceType: 'website',
+            sourceDomain,
+            originalTags: Array.isArray(repo.topics) ? repo.topics : [],
+            publishedAt: repo.created_at ? Date.parse(repo.created_at) : null,
+          };
+        }
+      } catch {}
+    }
+
     const ogTitle = this.extractMeta(html, 'og:title');
     const ogDesc = this.extractMeta(html, 'og:description');
     const ogImage = this.extractMeta(html, 'og:image');
 
-    // 从 URL 提取 owner/repo
-    const parts = url.replace('https://github.com/', '').split('/');
-    const owner = parts[0] || '';
-    const repo = parts[1]?.replace(/\.git$/, '') || '';
-
     return {
-      title: ogTitle ? ogTitle.replace(/ by .*$/, '') : `${owner}/${repo}`,
+      title: ogTitle ? ogTitle.replace(/ by .*$/, '') : parsed ? `${parsed.owner}/${parsed.repo}` : '',
       description: ogDesc || '',
-      imageUrl: ogImage || `https://avatars.githubusercontent.com/${owner}`,
-      author: owner || null,
-      sourceType: 'website' as SourceType,
+      imageUrl: ogImage || (parsed ? `https://avatars.githubusercontent.com/${parsed.owner}` : null),
+      author: parsed?.owner || null,
+      sourceType: 'website',
       sourceDomain,
+      originalTags: [],
+      publishedAt: null,
     };
   }
 
@@ -57,12 +88,14 @@ export class GitHubExtractor implements Extractor {
       description: ogDesc || '',
       imageUrl: ogImage || 'https://github.githubassets.com/images/modules/gist/gist-card-preview.png',
       author: null,
-      sourceType: 'website' as SourceType,
+      sourceType: 'website',
       sourceDomain,
+      originalTags: [],
+      publishedAt: null,
     };
   }
 
-  private extractGeneric(url: string, html: string, sourceDomain: string): ExtractedMetadata {
+  private extractGeneric(html: string, sourceDomain: string): ExtractedMetadata {
     const ogTitle = this.extractMeta(html, 'og:title');
     const ogDesc = this.extractMeta(html, 'og:description');
     const ogImage = this.extractMeta(html, 'og:image');
@@ -72,9 +105,20 @@ export class GitHubExtractor implements Extractor {
       title: ogTitle || this.extractTag(html, 'title'),
       description: ogDesc || '',
       imageUrl: ogImage,
-      author: author,
-      sourceType: 'website' as SourceType,
+      author,
+      sourceType: 'website',
       sourceDomain,
+      originalTags: [],
+      publishedAt: null,
+    };
+  }
+
+  private extractRepoParts(url: string): { owner: string; repo: string } | null {
+    const match = url.match(/github\.com\/([^/]+)\/([^/?#]+)/i);
+    if (!match) return null;
+    return {
+      owner: match[1],
+      repo: match[2].replace(/\.git$/, ''),
     };
   }
 

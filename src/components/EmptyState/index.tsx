@@ -1,20 +1,27 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { colors } from '../../theme/colors';
-import { spacing } from '../../theme/spacing';
+import { spacing, borderRadius } from '../../theme/spacing';
 
 interface EmptyStateProps {
-  icon?: string;
+  icon?: keyof typeof MaterialCommunityIcons.glyphMap;
   title: string;
   subtitle?: string;
 }
 
-export default function EmptyState({ icon = '📭', title, subtitle }: EmptyStateProps) {
+export default function EmptyState({
+  icon = 'bookshelf',
+  title,
+  subtitle,
+}: EmptyStateProps) {
   return (
     <View style={styles.container}>
-      <Text style={styles.icon}>{icon}</Text>
+      <View style={styles.iconWrap}>
+        <MaterialCommunityIcons name={icon} size={36} color={colors.primary} />
+      </View>
       <Text style={styles.title}>{title}</Text>
-      {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+      {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
     </View>
   );
 }
@@ -26,19 +33,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: spacing.xxxl,
   },
-  icon: {
-    fontSize: 48,
+  iconWrap: {
+    width: 72,
+    height: 72,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.backgroundMuted,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: spacing.lg,
   },
   title: {
     color: colors.textSecondary,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 17,
+    fontWeight: '600',
     textAlign: 'center',
   },
   subtitle: {
     color: colors.textMuted,
     fontSize: 14,
+    lineHeight: 21,
     marginTop: spacing.sm,
     textAlign: 'center',
   },

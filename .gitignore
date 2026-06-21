@@ -35,6 +35,7 @@ yarn-error.*
 
 # Build outputs
 dist/
+dist-web/
 build/
 *.orig
 

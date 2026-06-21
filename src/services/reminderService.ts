@@ -48,7 +48,7 @@ export class ReminderService {
     for (const row of rows) {
       await this.scheduleNotification(
         row.id,
-        row.title || '未读收藏',
+        row.title || '待阅读收藏',
         config.intervalDays,
       );
     }
@@ -64,9 +64,9 @@ export class ReminderService {
     await Notifications.scheduleNotificationAsync({
       identifier: `reminder-${id}`,
       content: {
-        title: '📚 收藏提醒',
+        title: '📚 阅读提醒',
         subtitle: title.length > 50 ? title.slice(0, 47) + '...' : title,
-        body: '这条收藏已经躺了几天了，要不要看看？',
+        body: '这条收藏已经放了一段时间，现在读掉它吧。',
         data: { bookmarkId: id, type: 'reminder' },
         sound: 'default',
         priority: Notifications.AndroidNotificationPriority.HIGH,
@@ -96,6 +96,6 @@ export class ReminderService {
 Notifications.addNotificationResponseReceivedListener((response) => {
   const data = response.notification.request.content.data;
   if (data?.type === 'reminder' && data?.bookmarkId) {
-    console.log('[Notification] 点击提醒，收藏 ID:', data.bookmarkId);
+    console.log('[Notification] 点击了阅读提醒，收藏 ID:', data.bookmarkId);
   }
 });

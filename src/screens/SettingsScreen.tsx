@@ -1,26 +1,138 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Switch, StyleSheet, ScrollView, Alert, Share } from 'react-native';
+import {
+  Platform,
+  View,
+  Text,
+  TouchableOpacity,
+  Switch,
+  StyleSheet,
+  ScrollView,
+  Alert,
+  Share,
+  TextInput,
+} from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getDatabase } from '../db/database';
+import {
+  collectBackupPayload,
+  ImportSummary,
+  normalizeBackupPayload,
+  restoreBackupPayload,
+  summarizeBackup,
+} from '../db/backupPayload';
+import { clearWebBackup, disableWebBackupSync, enableWebBackupSync } from '../db/webPersistence';
 import { useReminder } from '../hooks/useReminder';
+import { SettingsService } from '../services/settingsService';
 import { colors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/spacing';
+
+const settingsService = new SettingsService();
+
+function createBackupFilename(): string {
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return `collection-read-backup-${stamp}.json`;
+}
+
+function formatSummary(summary: ImportSummary): string {
+  return [
+    `收藏 ${summary.bookmarks} 条`,
+    `标签 ${summary.tags} 个`,
+    `收藏夹 ${summary.folders} 个`,
+    `笔记 ${summary.notes} 条`,
+    `标签关系 ${summary.bookmarkTags} 条`,
+    `收藏夹关系 ${summary.bookmarkFolders} 条`,
+    `Wiki ${summary.wikiSpaces} 个`,
+    `统计 ${summary.dailyStats} 条`,
+    `设置 ${summary.userSettings} 条`,
+    summary.skipped ? `跳过 ${summary.skipped} 条无效数据` : null,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+function downloadTextFile(fileName: string, text: string): void {
+  if (typeof document === 'undefined' || typeof URL === 'undefined') {
+    throw new Error('当前环境不支持浏览器下载。');
+  }
+
+  const blob = new Blob([text], { type: 'application/json;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function pickJsonFileOnWeb(): Promise<string | null> {
+  if (typeof document === 'undefined') {
+    throw new Error('当前环境不支持选择文件。');
+  }
+
+  return new Promise((resolve, reject) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'application/json,.json';
+    input.onchange = () => {
+      const file = input.files?.[0];
+      if (!file) {
+        resolve(null);
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : null);
+      reader.onerror = () => reject(new Error('读取文件失败'));
+      reader.readAsText(file);
+    };
+    input.click();
+  });
+}
 
 export default function SettingsScreen() {
   const reminder = useReminder();
   const [interval, setInterval] = useState(reminder.config.intervalDays);
+  const [resurfaceDailyLimit, setResurfaceDailyLimit] = useState('3');
+  const [resurfaceMaxPerItem, setResurfaceMaxPerItem] = useState('5');
+  const [resurfaceCooldownDays, setResurfaceCooldownDays] = useState('7');
 
   useEffect(() => {
     setInterval(reminder.config.intervalDays);
   }, [reminder.config.intervalDays]);
 
+  useEffect(() => {
+    loadResurfaceSettings();
+  }, []);
+
+  const loadResurfaceSettings = async () => {
+    const [dailyLimit, maxPerItem, cooldownDays] = await Promise.all([
+      settingsService.getValue('resurface_daily_limit', '3'),
+      settingsService.getValue('resurface_max_per_item', '5'),
+      settingsService.getValue('resurface_cooldown_days', '7'),
+    ]);
+    setResurfaceDailyLimit(dailyLimit);
+    setResurfaceMaxPerItem(maxPerItem);
+    setResurfaceCooldownDays(cooldownDays);
+  };
+
+  const saveResurfaceSettings = async () => {
+    await Promise.all([
+      settingsService.setValue('resurface_daily_limit', resurfaceDailyLimit || '3'),
+      settingsService.setValue('resurface_max_per_item', resurfaceMaxPerItem || '5'),
+      settingsService.setValue('resurface_cooldown_days', resurfaceCooldownDays || '7'),
+    ]);
+    Alert.alert('已保存', '擦亮配置已经更新。');
+  };
+
   const handleToggle = async (value: boolean) => {
     if (value && !reminder.permissionGranted) {
       const granted = await reminder.requestPermission();
       if (!granted) {
-        Alert.alert('通知权限', '请在系统设置中开启通知权限', [
-          { text: '好的' },
+        Alert.alert('通知权限', '请在系统设置中开启通知权限。', [
+          { text: '知道了' },
           { text: '去设置', onPress: () => reminder.updateConfig({ enabled: true }) },
         ]);
         return;
@@ -39,32 +151,19 @@ export default function SettingsScreen() {
   const handleExport = async () => {
     try {
       const db = await getDatabase();
-      const [bookmarks, tags, bookmarkTags, notes, dailyStats, achievements, settings] = await Promise.all([
-        db.getAllAsync('SELECT * FROM bookmarks'),
-        db.getAllAsync('SELECT * FROM tags'),
-        db.getAllAsync('SELECT * FROM bookmark_tags'),
-        db.getAllAsync('SELECT * FROM notes'),
-        db.getAllAsync('SELECT * FROM daily_stats'),
-        db.getAllAsync('SELECT * FROM achievements'),
-        db.getAllAsync('SELECT * FROM user_settings'),
-      ]);
-
-      const data = {
-        version: '1.0',
-        exportDate: new Date().toISOString(),
-        bookmarks,
-        tags,
-        bookmarkTags,
-        notes,
-        dailyStats,
-        achievements,
-        settings,
-      };
-
+      const data = await collectBackupPayload(db);
+      const summary = summarizeBackup(data);
       const json = JSON.stringify(data, null, 2);
-      const filename = `bookmark-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      const filename = createBackupFilename();
+
+      if (Platform.OS === 'web') {
+        downloadTextFile(filename, json);
+        window.alert(`导出成功\n${formatSummary(summary)}`);
+        return;
+      }
+
       const path = `${FileSystem.documentDirectory}${filename}`;
-      
+
       await FileSystem.writeAsStringAsync(path, json);
 
       const shared = await Share.share({
@@ -74,101 +173,98 @@ export default function SettingsScreen() {
       });
 
       if (shared.action === Share.sharedAction) {
-        Alert.alert('导出成功', '文件已分享到其他应用');
+        Alert.alert('导出成功', formatSummary(summary));
       }
     } catch (err: any) {
-      Alert.alert('导出失败', err.message || '请重试');
+      Alert.alert('导出失败', err.message || '请稍后重试');
     }
   };
 
   const handleImport = async () => {
     try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: 'application/json',
-        copyToCacheDirectory: true,
-      });
+      let content: string | null = null;
 
-      if (result.canceled || !result.assets || result.assets.length === 0) {
+      if (Platform.OS === 'web') {
+        content = await pickJsonFileOnWeb();
+      } else {
+        const result = await DocumentPicker.getDocumentAsync({
+          type: 'application/json',
+          copyToCacheDirectory: true,
+        });
+
+        if (result.canceled || !result.assets || result.assets.length === 0) {
+          return;
+        }
+
+        content = await FileSystem.readAsStringAsync(result.assets[0].uri);
+      }
+
+      if (!content) {
         return;
       }
 
-      const fileUri = result.assets[0].uri;
-      const content = await FileSystem.readAsStringAsync(fileUri);
-      const data = JSON.parse(content);
+      const data = normalizeBackupPayload(JSON.parse(content));
 
-      if (!data.bookmarks || !Array.isArray(data.bookmarks)) {
+      if (!data) {
         Alert.alert('导入失败', '文件格式不正确');
         return;
       }
 
-      Alert.alert('导入数据', `将导入：\n• ${data.bookmarks.length || 0} 条收藏\n• ${data.tags?.length || 0} 个标签\n• ${data.notes?.length || 0} 条笔记\n\n这将合并现有数据，不会覆盖。`, [
-        { text: '取消', style: 'cancel' },
-        {
-          text: '确认导入',
-          onPress: async () => {
-            const db = await getDatabase();
-            let imported = 0;
+      const preview = summarizeBackup(data);
+      const confirmMessage = `将导入并合并以下数据，不会清空现有数据：\n\n${formatSummary(preview)}`;
 
-            for (const tag of data.tags || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR IGNORE INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)',
-                  tag.id, tag.name, tag.color, tag.created_at,
-                );
-              } catch {}
-            }
+      const importData = async () => {
+        const db = await getDatabase();
+        const summary = await restoreBackupPayload(db, data);
+        if (Platform.OS === 'web' && typeof window !== 'undefined') {
+          window.alert(`导入完成\n${formatSummary(summary)}`);
+          return;
+        }
+        Alert.alert('导入完成', formatSummary(summary));
+      };
 
-            for (const bookmark of data.bookmarks || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR REPLACE INTO bookmarks (id, url, title, description, image_url, source_type, source_domain, learning_status, read_at, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                  bookmark.id, bookmark.url, bookmark.title, bookmark.description, bookmark.image_url, bookmark.source_type, bookmark.source_domain, bookmark.learning_status, bookmark.read_at, bookmark.notes, bookmark.created_at, bookmark.updated_at,
-                );
-                imported++;
-              } catch {}
-            }
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        if (window.confirm(confirmMessage)) {
+          await importData();
+        }
+        return;
+      }
 
-            for (const rel of data.bookmarkTags || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR IGNORE INTO bookmark_tags (bookmark_id, tag_id) VALUES (?, ?)',
-                  rel.bookmark_id, rel.tag_id,
-                );
-              } catch {}
-            }
-
-            for (const note of data.notes || []) {
-              try {
-                await db.runAsync(
-                  'INSERT OR REPLACE INTO notes (id, bookmark_id, content, created_at, updated_at) VALUES (?, ?, ?, ?, ?)',
-                  note.id, note.bookmark_id, note.content, note.created_at, note.updated_at,
-                );
-              } catch {}
-            }
-
-            Alert.alert('导入完成', `成功导入 ${imported} 条收藏`);
+      Alert.alert(
+        '导入数据',
+        confirmMessage,
+        [
+          { text: '取消', style: 'cancel' },
+          {
+            text: '确认导入',
+            onPress: importData,
           },
-        },
-      ]);
+        ],
+      );
     } catch (err: any) {
       Alert.alert('导入失败', err.message || '文件格式不正确');
     }
   };
 
   const handleReset = () => {
-    Alert.alert('重置数据', '确定要清除所有数据吗？此操作不可恢复。', [
+    Alert.alert('重置数据', '确定要清空所有数据吗？此操作不可恢复。', [
       { text: '取消', style: 'cancel' },
       {
         text: '重置',
         style: 'destructive',
         onPress: async () => {
+          disableWebBackupSync();
           const db = await getDatabase();
           await db.execAsync('DELETE FROM bookmark_tags');
+          await db.execAsync('DELETE FROM bookmark_folders');
           await db.execAsync('DELETE FROM bookmarks');
           await db.execAsync('DELETE FROM tags');
+          await db.execAsync('DELETE FROM folders');
           await db.execAsync('DELETE FROM notes');
           await db.execAsync('DELETE FROM daily_stats');
-          Alert.alert('已重置', '所有数据已清除');
+          clearWebBackup();
+          enableWebBackupSync();
+          Alert.alert('已重置', '所有数据已经清空。');
         },
       },
     ]);
@@ -176,38 +272,33 @@ export default function SettingsScreen() {
 
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>提醒设置</Text>
+      <View style={styles.header}>
+        <Text style={styles.headerEyebrow}>馆务设置</Text>
+        <Text style={styles.headerTitle}>设置</Text>
+      </View>
 
+      <SectionCard title="阅读提醒">
         <View style={styles.menuItem}>
-          <View style={styles.menuItemLeft}>
-            <Text style={styles.menuIcon}>🔔</Text>
-            <View style={styles.menuItemText}>
-              <Text style={styles.menuText}>未读提醒</Text>
-              <Text style={styles.menuSubtext}>
-                {reminder.config.enabled ? '已开启' : '已关闭'}
-              </Text>
-            </View>
+          <View style={styles.menuItemText}>
+            <Text style={styles.menuText}>待阅读提醒</Text>
+            <Text style={styles.menuSubtext}>{reminder.config.enabled ? '已开启' : '已关闭'}</Text>
           </View>
           <Switch
             value={reminder.config.enabled}
             onValueChange={handleToggle}
-            trackColor={{ false: colors.surfaceLight, true: colors.primary }}
+            trackColor={{ false: colors.surfaceLight, true: colors.primaryLight }}
             thumbColor={colors.white}
           />
         </View>
 
-        {reminder.config.enabled && (
+        {reminder.config.enabled ? (
           <View style={styles.intervalSection}>
             <Text style={styles.intervalLabel}>提醒间隔</Text>
             <View style={styles.intervalRow}>
               {intervalOptions.map((opt) => (
                 <TouchableOpacity
                   key={opt.days}
-                  style={[
-                    styles.intervalBtn,
-                    interval === opt.days && styles.intervalBtnActive,
-                  ]}
+                  style={[styles.intervalBtn, interval === opt.days && styles.intervalBtnActive]}
                   onPress={() => reminder.updateConfig({ intervalDays: opt.days })}
                 >
                   <Text
@@ -222,90 +313,131 @@ export default function SettingsScreen() {
               ))}
             </View>
           </View>
-        )}
+        ) : null}
 
-        {!reminder.permissionGranted && (
+        {!reminder.permissionGranted ? (
           <View style={styles.permissionTip}>
-            <Text style={styles.permissionTipText}>
-              💡 需要在系统设置中开启通知权限才能接收提醒
-            </Text>
+            <Text style={styles.permissionTipText}>需要系统通知权限才能收到提醒。</Text>
           </View>
-        )}
-      </View>
+        ) : null}
+      </SectionCard>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>通知状态</Text>
-        <View style={styles.menuItem}>
-          <Text style={styles.menuText}>已调度提醒</Text>
-          <Text style={styles.menuRight}>{reminder.config.enabled ? '活动中' : '无'}</Text>
-        </View>
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>数据</Text>
-        <TouchableOpacity style={styles.menuItem} onPress={handleExport}>
+      <SectionCard title="数据管理">
+        <TouchableOpacity style={styles.actionItem} onPress={handleExport}>
           <Text style={styles.menuText}>导出数据</Text>
           <Text style={styles.menuRight}>JSON</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={handleImport}>
+        <TouchableOpacity style={styles.actionItem} onPress={handleImport}>
           <Text style={styles.menuText}>导入数据</Text>
           <Text style={styles.menuRight}>JSON</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={handleReset}>
+        <TouchableOpacity style={styles.actionItem} onPress={handleReset}>
           <Text style={[styles.menuText, { color: colors.error }]}>重置所有数据</Text>
         </TouchableOpacity>
-      </View>
+      </SectionCard>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>关于</Text>
-        <View style={styles.menuItem}>
+      <SectionCard title="擦亮配置">
+        <Text style={styles.configLabel}>每日候选上限</Text>
+        <TextInput
+          style={styles.configInput}
+          value={resurfaceDailyLimit}
+          onChangeText={setResurfaceDailyLimit}
+          keyboardType="number-pad"
+        />
+        <Text style={styles.configLabel}>每条最多擦亮次数</Text>
+        <TextInput
+          style={styles.configInput}
+          value={resurfaceMaxPerItem}
+          onChangeText={setResurfaceMaxPerItem}
+          keyboardType="number-pad"
+        />
+        <Text style={styles.configLabel}>冷却天数</Text>
+        <TextInput
+          style={styles.configInput}
+          value={resurfaceCooldownDays}
+          onChangeText={setResurfaceCooldownDays}
+          keyboardType="number-pad"
+        />
+        <TouchableOpacity style={styles.saveConfigBtn} onPress={saveResurfaceSettings}>
+          <Text style={styles.saveConfigText}>保存擦亮配置</Text>
+        </TouchableOpacity>
+      </SectionCard>
+
+      <SectionCard title="关于">
+        <View style={styles.actionItem}>
           <Text style={styles.menuText}>版本</Text>
-          <Text style={styles.menuRight}>1.0.0 (Phase 2)</Text>
+          <Text style={styles.menuRight}>1.0.0</Text>
         </View>
-      </View>
+      </SectionCard>
+
+      <View style={{ height: 36 }} />
     </ScrollView>
+  );
+}
+
+function SectionCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <View style={styles.section}>
+      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionCard}>{children}</View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
+  header: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  headerEyebrow: {
+    color: colors.textMuted,
+    fontSize: 12,
+    letterSpacing: 1,
+  },
+  headerTitle: {
+    color: colors.text,
+    fontSize: 30,
+    fontWeight: '800',
+    marginTop: 2,
+  },
   section: { marginTop: spacing.xl },
   sectionTitle: {
     color: colors.textMuted,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.sm,
-    textTransform: 'uppercase',
+    letterSpacing: 1,
+  },
+  sectionCard: {
+    backgroundColor: colors.surface,
+    marginHorizontal: spacing.lg,
+    padding: spacing.lg,
+    borderRadius: borderRadius.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-  },
-  menuItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
   },
   menuItemText: {
     flex: 1,
   },
-  menuText: { color: colors.text, fontSize: 15, fontWeight: '500' },
+  menuText: { color: colors.text, fontSize: 15, fontWeight: '700' },
   menuSubtext: { color: colors.textMuted, fontSize: 12, marginTop: 2 },
   menuRight: { color: colors.textMuted, fontSize: 14 },
-  menuIcon: { fontSize: 18 },
   intervalSection: {
-    backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    padding: spacing.lg,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
+    marginTop: spacing.sm,
   },
   intervalLabel: {
     color: colors.textSecondary,
@@ -315,13 +447,14 @@ const styles = StyleSheet.create({
   intervalRow: {
     flexDirection: 'row',
     gap: spacing.sm,
+    flexWrap: 'wrap',
   },
   intervalBtn: {
-    flex: 1,
+    minWidth: 72,
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.backgroundMuted,
     alignItems: 'center',
   },
   intervalBtnActive: {
@@ -330,20 +463,52 @@ const styles = StyleSheet.create({
   intervalBtnText: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   intervalBtnTextActive: {
     color: colors.white,
   },
   permissionTip: {
-    backgroundColor: colors.warning + '20',
-    marginHorizontal: spacing.lg,
+    backgroundColor: colors.warning + '18',
     padding: spacing.md,
     borderRadius: borderRadius.md,
+    marginTop: spacing.sm,
   },
   permissionTipText: {
     color: colors.warning,
     fontSize: 12,
     lineHeight: 18,
+  },
+  actionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+  },
+  configLabel: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+  },
+  configInput: {
+    backgroundColor: colors.backgroundMuted,
+    color: colors.text,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: 14,
+  },
+  saveConfigBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    marginTop: spacing.lg,
+  },
+  saveConfigText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

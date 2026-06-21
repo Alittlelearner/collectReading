@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Bookmark } from '../../types';
 import { colors } from '../../theme/colors';
 import { spacing, borderRadius } from '../../theme/spacing';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
+import { getSourceLabel } from '../../utils/sourceMeta';
+import { formatRelativeDate } from '../../utils/formatters';
 
 interface ResurfaceCardProps {
   bookmark: Bookmark;
@@ -14,47 +15,42 @@ interface ResurfaceCardProps {
 }
 
 export default function ResurfaceCard({ bookmark, onPress, onSkip, onDone }: ResurfaceCardProps) {
-  const daysAgo = Math.floor((Date.now() - bookmark.createdAt) / 86400000);
-
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerIcon}>✨</Text>
-        <Text style={styles.headerText}>今日擦亮</Text>
+        <View style={styles.headerBadge}>
+          <MaterialCommunityIcons name="candle" size={16} color={colors.accent} />
+          <Text style={styles.headerText}>今日擦亮</Text>
+        </View>
+        <Text style={styles.headerHint}>从旧藏里抽一条再读</Text>
       </View>
 
-      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
+      <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.85}>
         <Text style={styles.title} numberOfLines={2}>
-          {bookmark.title || '(无标题)'}
+          {bookmark.title || '未命名内容'}
         </Text>
         <Text style={styles.meta}>
-          {getSourceLabel(bookmark.sourceType)} · 收藏于 {daysAgo} 天前
+          {getSourceLabel(bookmark.sourceType)} · 收藏于 {formatRelativeDate(bookmark.createdAt)}
         </Text>
         {bookmark.notes ? (
-          <Text style={styles.notes} numberOfLines={1}>
+          <Text style={styles.notes} numberOfLines={2}>
             {bookmark.notes}
           </Text>
-        ) : null}
+        ) : (
+          <Text style={styles.notesPlaceholder}>没有备注，正适合重新翻一遍。</Text>
+        )}
       </TouchableOpacity>
 
       <View style={styles.actions}>
         <TouchableOpacity style={[styles.actionBtn, styles.skipBtn]} onPress={onSkip}>
-          <Text style={styles.skipText}>跳过</Text>
+          <Text style={styles.skipText}>换一本</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.actionBtn, styles.doneBtn]} onPress={onDone}>
-          <Text style={styles.doneText}>已读</Text>
+          <Text style={styles.doneText}>完成阅读</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
-}
-
-function getSourceLabel(type: string): string {
-  const labels: Record<string, string> = {
-    bilibili: 'B站', zhihu: '知乎', wechat: '公众号',
-    ebook: '电子书', website: '网站', metasearch: '秘塔', other: '其他',
-  };
-  return labels[type] || '其他';
 }
 
 const styles = StyleSheet.create({
@@ -64,45 +60,59 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing.md,
+  },
+  headerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: spacing.xs,
   },
-  headerIcon: {
-    fontSize: 14,
-  },
   headerText: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    fontWeight: '600',
+    color: colors.primaryDark,
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  headerHint: {
+    color: colors.textMuted,
+    fontSize: 12,
   },
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
+    backgroundColor: colors.card,
+    borderRadius: borderRadius.lg,
+    padding: spacing.xl,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 5,
+    borderLeftColor: colors.accent,
   },
   title: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: '600',
-    lineHeight: 22,
+    fontSize: 18,
+    fontWeight: '700',
+    lineHeight: 27,
     marginBottom: spacing.sm,
   },
   meta: {
-    color: colors.textMuted,
-    fontSize: 12,
-    marginBottom: spacing.xs,
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginBottom: spacing.sm,
   },
   notes: {
     color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  notesPlaceholder: {
+    color: colors.textMuted,
     fontSize: 13,
+    fontStyle: 'italic',
   },
   actions: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    marginTop: spacing.sm,
+    marginTop: spacing.md,
     gap: spacing.sm,
   },
   actionBtn: {
@@ -111,19 +121,19 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
   skipBtn: {
-    backgroundColor: colors.surfaceLight,
+    backgroundColor: colors.backgroundMuted,
   },
   doneBtn: {
-    backgroundColor: colors.success + '20',
+    backgroundColor: colors.success,
   },
   skipText: {
     color: colors.textSecondary,
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   doneText: {
-    color: colors.success,
+    color: colors.white,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
 });

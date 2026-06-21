@@ -1,17 +1,11 @@
 import React, { useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  Dimensions,
-  SafeAreaView,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Dimensions, SafeAreaView } from 'react-native';
 import { LineChart, PieChart } from 'react-native-chart-kit';
 import { useStats } from '../hooks/useStats';
 import { useBookmarks } from '../hooks/useBookmarks';
 import { colors } from '../theme/colors';
 import { spacing, borderRadius } from '../theme/spacing';
+import { getSourceLabel } from '../utils/sourceMeta';
 
 const screenWidth = Dimensions.get('window').width;
 
@@ -19,18 +13,23 @@ interface StatCardProps {
   title: string;
   value: string | number;
   subtitle?: string;
-  icon?: string;
 }
 
-function StatCard({ title, value, subtitle, icon = '📊' }: StatCardProps) {
+function StatCard({ title, value, subtitle }: StatCardProps) {
   return (
     <View style={styles.statCard}>
-      <Text style={styles.statIcon}>{icon}</Text>
-      <View style={styles.statContent}>
-        <Text style={styles.statValue}>{value}</Text>
-        <Text style={styles.statTitle}>{title}</Text>
-        {subtitle && <Text style={styles.statSubtitle}>{subtitle}</Text>}
-      </View>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statTitle}>{title}</Text>
+      {subtitle ? <Text style={styles.statSubtitle}>{subtitle}</Text> : null}
+    </View>
+  );
+}
+
+function PeriodCard({ label, value }: { label: string; value: number }) {
+  return (
+    <View style={styles.periodCard}>
+      <Text style={styles.periodValue}>{value}</Text>
+      <Text style={styles.periodLabel}>{label}</Text>
     </View>
   );
 }
@@ -44,29 +43,28 @@ export default function StatsDashboardScreen() {
     stats.refresh();
   }, []);
 
-  // 计算来源分布数据
   const sourceData = useMemo(() => {
     const groups = bookmarks.getSourceGroups();
     const dataMap: Record<string, number> = {};
-    
-    for (const g of groups) {
-      dataMap[g.sourceType] = g.count;
+
+    for (const group of groups) {
+      dataMap[group.sourceType] = group.count;
     }
 
-    const colorKeys = Object.keys(dataMap);
+    const keys = Object.keys(dataMap);
     const total = Object.values(dataMap).reduce((a, b) => a + b, 0);
 
-    return colorKeys.map((key, index) => ({
-      name: getSourceLabel(key),
+    return keys.map((key) => ({
+      name: getSourceLabel(key as any),
       count: dataMap[key],
       percentage: total > 0 ? Math.round((dataMap[key] / total) * 100) : 0,
-      color: colors.sourceColors[key as keyof typeof colors.sourceColors] || colors.sourceColors.other,
+      color:
+        colors.sourceColors[key as keyof typeof colors.sourceColors] || colors.sourceColors.other,
       legendFontColor: colors.text,
       legendFontSize: 12,
     }));
   }, [bookmarks.bookmarks]);
 
-  // 计算趋势数据
   const trendData = useMemo(() => {
     const dailyStats = stats.dailyStats;
     if (dailyStats.length === 0) {
@@ -77,18 +75,18 @@ export default function StatsDashboardScreen() {
     const last7Days = sorted.slice(-7);
 
     return {
-      labels: last7Days.map((d) => {
-        const date = new Date(d.date);
+      labels: last7Days.map((day) => {
+        const date = new Date(day.date);
         return `${date.getMonth() + 1}/${date.getDate()}`;
       }),
-      data: last7Days.map((d) => d.readCount || 0),
+      data: last7Days.map((day) => day.readCount || 0),
     };
   }, [stats.dailyStats]);
 
   if (!summary) {
     return (
       <View style={styles.center}>
-        <Text style={styles.loadingText}>加载中...</Text>
+        <Text style={styles.loadingText}>正在统计你的阅读轨迹...</Text>
       </View>
     );
   }
@@ -97,59 +95,38 @@ export default function StatsDashboardScreen() {
     <SafeAreaView style={styles.container}>
       <ScrollView showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>学习统计</Text>
+          <Text style={styles.headerEyebrow}>阅读面板</Text>
+          <Text style={styles.headerTitle}>阅读统计</Text>
         </View>
 
-        {/* 概览统计 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>概览</Text>
           <View style={styles.statGrid}>
-            <StatCard
-              title="总收藏"
-              value={summary.totalBookmarks}
-              icon="📚"
-            />
-            <StatCard
-              title="已读完"
-              value={summary.totalRead}
-              icon="✅"
-            />
+            <StatCard title="总收藏" value={summary.totalBookmarks} />
+            <StatCard title="已读" value={summary.totalRead} />
             <StatCard
               title="完成率"
               value={`${Math.round(summary.readRate * 100)}%`}
               subtitle={`${summary.totalBookmarks - summary.totalRead} 条未读`}
-              icon="📈"
             />
             <StatCard
               title="连续天数"
               value={summary.currentStreak}
-              subtitle={`最长：${summary.longestStreak} 天`}
-              icon="🔥"
+              subtitle={`最长 ${summary.longestStreak} 天`}
             />
           </View>
         </View>
 
-        {/* 时间段统计 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>近期表现</Text>
           <View style={styles.periodRow}>
-            <View style={styles.periodCard}>
-              <Text style={styles.periodValue}>{summary.todayRead}</Text>
-              <Text style={styles.periodLabel}>今日完成</Text>
-            </View>
-            <View style={styles.periodCard}>
-              <Text style={styles.periodValue}>{summary.weeklyRead}</Text>
-              <Text style={styles.periodLabel}>本周完成</Text>
-            </View>
-            <View style={styles.periodCard}>
-              <Text style={styles.periodValue}>{summary.monthlyRead}</Text>
-              <Text style={styles.periodLabel}>本月完成</Text>
-            </View>
+            <PeriodCard label="今日完成" value={summary.todayRead} />
+            <PeriodCard label="本周完成" value={summary.weeklyRead} />
+            <PeriodCard label="本月完成" value={summary.monthlyRead} />
           </View>
         </View>
 
-        {/* 趋势图 */}
-        {trendData.data.length > 1 && (
+        {trendData.data.length > 1 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>完成趋势</Text>
             <View style={styles.chartContainer}>
@@ -159,7 +136,7 @@ export default function StatsDashboardScreen() {
                   datasets: [{ data: trendData.data }],
                 }}
                 width={screenWidth - spacing.xxl * 2}
-                height={200}
+                height={210}
                 chartConfig={{
                   backgroundColor: colors.surface,
                   backgroundGradientFrom: colors.surface,
@@ -167,18 +144,16 @@ export default function StatsDashboardScreen() {
                   decimalPlaces: 0,
                   color: () => colors.primary,
                   labelColor: () => colors.textSecondary,
-                  style: { borderRadius: 16 },
-                  propsForDots: { r: '6', strokeWidth: '2', stroke: colors.primary },
+                  propsForDots: { r: '5', strokeWidth: '2', stroke: colors.primaryDark },
                 }}
                 bezier
                 style={styles.chart}
               />
             </View>
           </View>
-        )}
+        ) : null}
 
-        {/* 来源分布 */}
-        {sourceData.length > 0 && (
+        {sourceData.length > 0 ? (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>来源分布</Text>
             <View style={styles.chartContainer}>
@@ -186,9 +161,7 @@ export default function StatsDashboardScreen() {
                 data={sourceData}
                 width={screenWidth - spacing.xxl * 2}
                 height={220}
-                chartConfig={{
-                  color: () => colors.primary,
-                }}
+                chartConfig={{ color: () => colors.primary }}
                 accessor="count"
                 backgroundColor="transparent"
                 paddingLeft="15"
@@ -207,7 +180,7 @@ export default function StatsDashboardScreen() {
               </View>
             </View>
           </View>
-        )}
+        ) : null}
 
         <View style={{ height: 40 }} />
       </ScrollView>
@@ -215,35 +188,38 @@ export default function StatsDashboardScreen() {
   );
 }
 
-function getSourceLabel(type: string): string {
-  const labels: Record<string, string> = {
-    bilibili: 'B 站', zhihu: '知乎', wechat: '公众号',
-    ebook: '电子书', website: '网站', metasearch: '秘塔', other: '其他',
-  };
-  return labels[type] || '其他';
-}
-
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background },
+  center: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: colors.background,
+  },
   loadingText: { color: colors.textMuted, fontSize: 15 },
   header: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
   },
+  headerEyebrow: {
+    color: colors.textMuted,
+    fontSize: 12,
+    letterSpacing: 1,
+  },
   headerTitle: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 30,
+    fontWeight: '800',
+    marginTop: 2,
   },
   section: { marginTop: spacing.xl },
   sectionTitle: {
     color: colors.textMuted,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    textTransform: 'uppercase',
+    letterSpacing: 1,
   },
   statGrid: {
     flexDirection: 'row',
@@ -254,28 +230,25 @@ const styles = StyleSheet.create({
   statCard: {
     width: '47%',
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  statIcon: { fontSize: 24 },
-  statContent: { flex: 1 },
   statValue: {
     color: colors.text,
-    fontSize: 24,
-    fontWeight: '700',
+    fontSize: 26,
+    fontWeight: '800',
   },
   statTitle: {
     color: colors.textSecondary,
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 13,
+    marginTop: 6,
   },
   statSubtitle: {
     color: colors.textMuted,
     fontSize: 11,
-    marginTop: 2,
+    marginTop: 3,
   },
   periodRow: {
     flexDirection: 'row',
@@ -285,13 +258,15 @@ const styles = StyleSheet.create({
   periodCard: {
     flex: 1,
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    borderRadius: borderRadius.lg,
     padding: spacing.lg,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   periodValue: {
     color: colors.primary,
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
   },
   periodLabel: {
@@ -302,8 +277,10 @@ const styles = StyleSheet.create({
   chartContainer: {
     backgroundColor: colors.surface,
     marginHorizontal: spacing.lg,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   chart: {
     marginVertical: spacing.sm,
@@ -316,7 +293,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     paddingTop: spacing.md,
     borderTopWidth: 1,
-    borderTopColor: colors.surfaceLight,
+    borderTopColor: colors.border,
   },
   legendItem: {
     flexDirection: 'row',

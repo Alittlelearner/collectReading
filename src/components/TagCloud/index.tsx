@@ -13,7 +13,7 @@ export default function TagCloud({ tags, onPress }: TagCloudProps) {
   if (tags.length === 0) {
     return (
       <View style={styles.empty}>
-        <Text style={styles.emptyText}>暂无标签</Text>
+        <Text style={styles.emptyText}>还没有标签</Text>
       </View>
     );
   }
@@ -23,13 +23,13 @@ export default function TagCloud({ tags, onPress }: TagCloudProps) {
       {tags.map((tag) => (
         <TouchableOpacity
           key={tag.id}
-          style={[styles.tag, { backgroundColor: tag.color + '20' }]}
+          style={[styles.tag, { backgroundColor: tag.color + '16', borderColor: tag.color + '35' }]}
           onPress={() => onPress(tag.id)}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
           <View style={[styles.dot, { backgroundColor: tag.color }]} />
           <Text style={[styles.name, { color: tag.color }]}>{tag.name}</Text>
-          <Text style={[styles.count, { color: tag.color + '80' }]}>{tag.bookmarkCount}</Text>
+          <Text style={[styles.count, { color: tag.color }]}>{tag.bookmarkCount}</Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -50,6 +50,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.full,
     gap: spacing.xs,
+    borderWidth: 1,
   },
   dot: {
     width: 8,
@@ -58,11 +59,11 @@ const styles = StyleSheet.create({
   },
   name: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   count: {
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   empty: {
     alignItems: 'center',

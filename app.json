@@ -6,10 +6,6 @@
     "orientation": "portrait",
     "icon": "./src/assets/icon.png",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
-    "splash": {
-      "backgroundColor": "#0f172a"
-    },
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.learninghub.bookmarktracker"
@@ -26,8 +22,11 @@
       "web"
     ],
     "plugins": [
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-sqlite",
+      "expo-asset",
+      "expo-font"
     ],
-    "sdkVersion": "54.0.0"
+    "sdkVersion": "56.0.0"
   }
 }

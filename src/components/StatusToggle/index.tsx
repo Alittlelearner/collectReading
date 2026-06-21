@@ -19,10 +19,10 @@ export default function StatusToggle({ status, onToggle, size = 'normal' }: Stat
       style={[
         styles.container,
         isSmall && styles.containerSmall,
-        { backgroundColor: isRead ? colors.success + '20' : colors.surfaceLight },
+        { backgroundColor: isRead ? colors.success + '18' : colors.backgroundMuted },
       ]}
       onPress={onToggle}
-      activeOpacity={0.7}
+      activeOpacity={0.85}
     >
       <View
         style={[
@@ -69,7 +69,7 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   labelSmall: {
     fontSize: 12,

@@ -1,12 +1,50 @@
-import { Extractor, ExtractedMetadata, SourceType } from './types';
+import { Extractor, ExtractedMetadata, ExtractorContext, SourceType } from './types';
+import { fetchJsonWithTimeout } from '../network';
 
 export class SspaiExtractor implements Extractor {
+  readonly id = 'sspai';
+  readonly displayName = '少数派';
   readonly pattern = /sspai\.com\//;
   readonly sourceType: SourceType = 'website';
   readonly needsHTML = true;
+  readonly priority = 60;
 
-  async extract(url: string, html: string): Promise<ExtractedMetadata> {
-    const sourceDomain = new URL(url).hostname;
+  async extract(url: string, context: ExtractorContext): Promise<ExtractedMetadata> {
+    const sourceDomain = context.sourceDomain;
+    const articleId = this.extractArticleId(url);
+
+    if (articleId) {
+      try {
+        const json = await fetchJsonWithTimeout<any>(
+          `https://sspai.com/api/v1/article/info/get?id=${encodeURIComponent(articleId)}`,
+          {
+            headers: {
+              Accept: 'application/json',
+              'User-Agent': 'Mozilla/5.0',
+            },
+          },
+          8000,
+        );
+
+        const article = json?.data;
+        if (article) {
+          return {
+            title: article.title || '',
+            description: article.summary || this.extractSummaryFromBody(article.body || ''),
+            imageUrl: article.banner
+              ? `https://cdnfile.sspai.com/${article.banner}`
+              : this.extractImageFromBody(article.body || ''),
+            author: article.author?.nickname || article.author?.username || null,
+            sourceType: 'website',
+            sourceDomain,
+            originalTags: this.extractTags(article),
+            publishedAt: this.toMillis(article.released_at || article.created_at || article.modify_at),
+          };
+        }
+      } catch {}
+    }
+
+    const html = context.html || '';
 
     return {
       title: this.extractTitle(html),
@@ -15,79 +53,56 @@ export class SspaiExtractor implements Extractor {
       author: this.extractAuthor(html),
       sourceType: 'website',
       sourceDomain,
+      originalTags: [],
+      publishedAt: null,
     };
   }
 
-  private extractTitle(html: string): string {
-    // 少数派使用 JSON-LD
-    const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
-    if (jsonLdMatch) {
-      try {
-        const json = JSON.parse(jsonLdMatch[1]);
-        if (json.headline) return json.headline;
-        if (json.name) return json.name;
-      } catch {}
-    }
+  private extractArticleId(url: string): string | null {
+    const match = url.match(/\/post\/(\d+)/);
+    return match ? match[1] : null;
+  }
 
+  private extractTitle(html: string): string {
     const ogTitle = this.extractMeta(html, 'og:title');
-    if (ogTitle) return ogTitle;
+    if (ogTitle) return ogTitle.replace(/\s*-\s*少数派$/, '').trim();
 
     const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-    if (titleMatch) return titleMatch[1].replace(/ - 少数派$/, '').trim();
-
-    return '';
+    return titleMatch ? titleMatch[1].replace(/\s*-\s*少数派$/, '').trim() : '';
   }
 
   private extractDescription(html: string): string {
-    const ogDesc = this.extractMeta(html, 'og:description');
-    if (ogDesc) return ogDesc;
-
-    // 从 JSON-LD 提取
-    const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
-    if (jsonLdMatch) {
-      try {
-        const json = JSON.parse(jsonLdMatch[1]);
-        if (json.description) return json.description;
-      } catch {}
-    }
-
-    return '';
+    return this.extractMeta(html, 'og:description') || this.extractMeta(html, 'description') || '';
   }
 
   private extractImage(html: string): string | null {
-    const ogImage = this.extractMeta(html, 'og:image');
-    if (ogImage) return ogImage;
-
-    // 从 JSON-LD 提取
-    const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
-    if (jsonLdMatch) {
-      try {
-        const json = JSON.parse(jsonLdMatch[1]);
-        if (json.image) {
-          return typeof json.image === 'string' ? json.image : json.image.url;
-        }
-      } catch {}
-    }
-
-    return null;
+    return this.extractMeta(html, 'og:image');
   }
 
   private extractAuthor(html: string): string | null {
-    // 从 JSON-LD 提取
-    const jsonLdMatch = html.match(/<script[^>]*type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/i);
-    if (jsonLdMatch) {
-      try {
-        const json = JSON.parse(jsonLdMatch[1]);
-        if (json.author) {
-          return typeof json.author === 'string' ? json.author : json.author.name;
-        }
-      } catch {}
+    return this.extractMeta(html, 'article:author');
+  }
+
+  private extractSummaryFromBody(body: string): string {
+    return body
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 180);
+  }
+
+  private extractImageFromBody(body: string): string | null {
+    const match = body.match(/<(?:img)[^>]+(?:data-original|src)=["']([^"']+)["']/i);
+    return match ? match[1] : null;
+  }
+
+  private extractTags(article: any): string[] {
+    const tags = article?.keywords || article?.tags || [];
+    if (!Array.isArray(tags)) {
+      return [];
     }
 
-    const metaAuthor = this.extractMeta(html, 'article:author');
-    if (metaAuthor) return metaAuthor;
-
-    return null;
+    return tags.filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0);
   }
 
   private extractMeta(html: string, property: string): string | null {
@@ -96,5 +111,13 @@ export class SspaiExtractor implements Extractor {
       new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)`, 'i'),
     );
     return match ? match[1] : null;
+  }
+
+  private toMillis(value: unknown): number | null {
+    if (typeof value !== 'number') {
+      return null;
+    }
+
+    return value > 1000000000000 ? value : value * 1000;
   }
 }
