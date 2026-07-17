@@ -45,6 +45,9 @@ function formatSummary(summary: ImportSummary): string {
     `Wiki ${summary.wikiSpaces} 个`,
     `统计 ${summary.dailyStats} 条`,
     `设置 ${summary.userSettings} 条`,
+    `书架 ${summary.libraryItems} 条`,
+    `Markdown 笔记 ${summary.markdownNotes} 篇`,
+    `笔记图片 ${summary.noteAssets} 个`,
     summary.skipped ? `跳过 ${summary.skipped} 条无效数据` : null,
   ]
     .filter(Boolean)
@@ -261,6 +264,9 @@ export default function SettingsScreen() {
           await db.execAsync('DELETE FROM tags');
           await db.execAsync('DELETE FROM folders');
           await db.execAsync('DELETE FROM notes');
+          await db.execAsync('DELETE FROM note_assets');
+          await db.execAsync('DELETE FROM markdown_notes');
+          await db.execAsync('DELETE FROM library_items');
           await db.execAsync('DELETE FROM daily_stats');
           clearWebBackup();
           enableWebBackupSync();

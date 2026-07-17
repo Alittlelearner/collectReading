@@ -1,5 +1,9 @@
 import { getDatabase } from './database';
-import { enableWebBackupSync, restoreFromWebBackupIfNeeded } from './webPersistence';
+import {
+  enableWebBackupSync,
+  restoreFromLegacyWebSQLiteIfNeeded,
+  restoreFromWebBackupIfNeeded,
+} from './webPersistence';
 
 export async function runMigrations(): Promise<void> {
   const db = await getDatabase();
@@ -89,6 +93,54 @@ export async function runMigrations(): Promise<void> {
       value TEXT NOT NULL
     );
 
+    CREATE TABLE IF NOT EXISTS library_items (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      author TEXT,
+      file_name TEXT NOT NULL,
+      file_ext TEXT NOT NULL DEFAULT '',
+      mime_type TEXT,
+      file_path TEXT NOT NULL,
+      cover_path TEXT,
+      file_size INTEGER NOT NULL DEFAULT 0,
+      source_uri TEXT,
+      status TEXT NOT NULL DEFAULT 'unread',
+      progress REAL NOT NULL DEFAULT 0,
+      current_location TEXT,
+      imported_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      deleted_at INTEGER
+    );
+
+    CREATE TABLE IF NOT EXISTS markdown_notes (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL DEFAULT '',
+      slug TEXT NOT NULL DEFAULT '',
+      folder_path TEXT NOT NULL,
+      markdown_path TEXT NOT NULL,
+      content_cache TEXT NOT NULL DEFAULT '',
+      excerpt TEXT NOT NULL DEFAULT '',
+      linked_book_id TEXT,
+      linked_bookmark_id TEXT,
+      word_count INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      deleted_at INTEGER,
+      FOREIGN KEY (linked_book_id) REFERENCES library_items(id) ON DELETE SET NULL,
+      FOREIGN KEY (linked_bookmark_id) REFERENCES bookmarks(id) ON DELETE SET NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS note_assets (
+      id TEXT PRIMARY KEY,
+      note_id TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      file_path TEXT NOT NULL,
+      mime_type TEXT,
+      size INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (note_id) REFERENCES markdown_notes(id) ON DELETE CASCADE
+    );
+
     CREATE INDEX IF NOT EXISTS idx_bookmarks_status ON bookmarks(learning_status);
     CREATE INDEX IF NOT EXISTS idx_bookmarks_source ON bookmarks(source_type);
     CREATE INDEX IF NOT EXISTS idx_bookmarks_created ON bookmarks(created_at);
@@ -98,6 +150,11 @@ export async function runMigrations(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_bookmark_folders_folder ON bookmark_folders(folder_id);
     CREATE INDEX IF NOT EXISTS idx_wiki_spaces_updated ON wiki_spaces(updated_at);
     CREATE INDEX IF NOT EXISTS idx_notes_bookmark ON notes(bookmark_id);
+    CREATE INDEX IF NOT EXISTS idx_library_items_updated ON library_items(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_library_items_status ON library_items(status);
+    CREATE INDEX IF NOT EXISTS idx_markdown_notes_updated ON markdown_notes(updated_at);
+    CREATE INDEX IF NOT EXISTS idx_markdown_notes_book ON markdown_notes(linked_book_id);
+    CREATE INDEX IF NOT EXISTS idx_note_assets_note ON note_assets(note_id);
   `);
 
   await addColumnIfMissing('bookmarks', 'description', "TEXT NOT NULL DEFAULT ''");
@@ -109,6 +166,7 @@ export async function runMigrations(): Promise<void> {
   await addColumnIfMissing('bookmarks', 'is_starred', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing('bookmarks', 'is_archived', 'INTEGER NOT NULL DEFAULT 0');
   await addColumnIfMissing('bookmarks', 'deleted_at', 'INTEGER');
+  await restoreFromLegacyWebSQLiteIfNeeded(db);
   await restoreFromWebBackupIfNeeded(db);
   enableWebBackupSync();
 

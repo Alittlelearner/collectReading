@@ -54,3 +54,5 @@ start-expo.sh
 
 # Documentation
 .monkeycode/
+.codex-verify/
+.npm-cache/

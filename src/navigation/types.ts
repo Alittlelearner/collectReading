@@ -10,6 +10,11 @@ export type HomeStackParamList = {
   StatsDashboard: undefined;
   WikiHub: undefined;
   WikiDetail: { wikiId: string };
+  Library: undefined;
+  LibraryItemDetail: { libraryItemId: string };
+  MarkdownNotes: undefined;
+  MarkdownNoteDetail: { noteId: string };
+  MarkdownNoteEditor: { noteId: string };
   ProfileMain: undefined;
   Settings: undefined;
   Achievements: undefined;
@@ -25,5 +30,10 @@ export type SourceGroupScreenProps = NativeStackScreenProps<HomeStackParamList, 
 export type StatsDashboardScreenProps = NativeStackScreenProps<HomeStackParamList, 'StatsDashboard'>;
 export type WikiHubScreenProps = NativeStackScreenProps<HomeStackParamList, 'WikiHub'>;
 export type WikiDetailScreenProps = NativeStackScreenProps<HomeStackParamList, 'WikiDetail'>;
+export type LibraryScreenProps = NativeStackScreenProps<HomeStackParamList, 'Library'>;
+export type LibraryItemDetailScreenProps = NativeStackScreenProps<HomeStackParamList, 'LibraryItemDetail'>;
+export type MarkdownNotesScreenProps = NativeStackScreenProps<HomeStackParamList, 'MarkdownNotes'>;
+export type MarkdownNoteDetailScreenProps = NativeStackScreenProps<HomeStackParamList, 'MarkdownNoteDetail'>;
+export type MarkdownNoteEditorScreenProps = NativeStackScreenProps<HomeStackParamList, 'MarkdownNoteEditor'>;
 export type ProfileScreenProps = NativeStackScreenProps<HomeStackParamList, 'ProfileMain'>;
 export type SettingsScreenProps = NativeStackScreenProps<HomeStackParamList, 'Settings'>;

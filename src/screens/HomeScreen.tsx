@@ -268,6 +268,12 @@ export default function HomeScreen() {
           <TouchableOpacity style={styles.headerAction} onPress={() => navigation.navigate('WikiHub')}>
             <MaterialCommunityIcons name="book-multiple-outline" size={20} color={colors.primaryDark} />
           </TouchableOpacity>
+          <TouchableOpacity style={styles.headerAction} onPress={() => navigation.navigate('Library')}>
+            <MaterialCommunityIcons name="library-shelves" size={20} color={colors.primaryDark} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerAction} onPress={() => navigation.navigate('MarkdownNotes')}>
+            <MaterialCommunityIcons name="notebook-edit-outline" size={20} color={colors.primaryDark} />
+          </TouchableOpacity>
           {!isWeb ? (
             <TouchableOpacity style={styles.headerAction} onPress={() => navigation.navigate('AddBookmark')}>
               <MaterialCommunityIcons name="plus" size={20} color={colors.primaryDark} />
@@ -524,6 +530,8 @@ export default function HomeScreen() {
         {renderRailButton('today', 'white-balance-sunny', () =>
           applySidebarFilters('today', { scope: 'active', createdAfter: startOfToday }), activeSidebarKey === 'today')}
         {renderRailButton('wiki', 'book-multiple-outline', () => navigation.navigate('WikiHub'))}
+        {renderRailButton('library', 'library-shelves', () => navigation.navigate('Library'))}
+        {renderRailButton('markdown-notes', 'notebook-edit-outline', () => navigation.navigate('MarkdownNotes'))}
       </View>
 
       <View style={styles.railBottom}>

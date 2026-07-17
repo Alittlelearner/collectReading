@@ -1,15 +1,43 @@
-import * as Notifications from 'expo-notifications';
 import { getDatabase } from '../db/database';
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+type NotificationsModule = typeof import('expo-notifications');
+
+let notificationsModule: NotificationsModule | null | undefined;
+let notificationListenerReady = false;
+
+async function getNotifications(): Promise<NotificationsModule | null> {
+  if (notificationsModule !== undefined) {
+    return notificationsModule;
+  }
+
+  try {
+    notificationsModule = await import('expo-notifications');
+    notificationsModule.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: true,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+
+    if (!notificationListenerReady) {
+      notificationsModule.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data;
+        if (data?.type === 'reminder' && data?.bookmarkId) {
+          console.log('[Notification] 点击了阅读提醒，收藏 ID:', data.bookmarkId);
+        }
+      });
+      notificationListenerReady = true;
+    }
+  } catch (error) {
+    notificationsModule = null;
+    console.warn('[Notification] 当前运行环境不支持通知功能。', error);
+  }
+
+  return notificationsModule;
+}
 
 interface ReminderConfig {
   enabled: boolean;
@@ -19,11 +47,21 @@ interface ReminderConfig {
 
 export class ReminderService {
   async requestPermission(): Promise<boolean> {
+    const Notifications = await getNotifications();
+    if (!Notifications) {
+      return false;
+    }
+
     const result = await Notifications.requestPermissionsAsync() as any;
     return result.status === 'granted' || result.granted === true;
   }
 
   async scheduleUnreadReminders(config: ReminderConfig): Promise<void> {
+    const Notifications = await getNotifications();
+    if (!Notifications) {
+      return;
+    }
+
     if (!config.enabled) {
       await Notifications.cancelAllScheduledNotificationsAsync();
       return;
@@ -59,6 +97,11 @@ export class ReminderService {
     title: string,
     intervalDays: number,
   ): Promise<void> {
+    const Notifications = await getNotifications();
+    if (!Notifications) {
+      return;
+    }
+
     const seconds = intervalDays * 24 * 60 * 60;
 
     await Notifications.scheduleNotificationAsync({
@@ -80,22 +123,30 @@ export class ReminderService {
   }
 
   async cancelReminder(bookmarkId: string): Promise<void> {
+    const Notifications = await getNotifications();
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.cancelScheduledNotificationAsync(`reminder-${bookmarkId}`);
   }
 
   async getPermissionsStatus(): Promise<'granted' | 'denied' | 'undetermined'> {
+    const Notifications = await getNotifications();
+    if (!Notifications) {
+      return 'undetermined';
+    }
+
     const result = await Notifications.getPermissionsAsync() as any;
     return result.status || 'undetermined';
   }
 
-  async getAllScheduled(): Promise<Notifications.NotificationRequest[]> {
+  async getAllScheduled(): Promise<unknown[]> {
+    const Notifications = await getNotifications();
+    if (!Notifications) {
+      return [];
+    }
+
     return await Notifications.getAllScheduledNotificationsAsync();
   }
 }
-
-Notifications.addNotificationResponseReceivedListener((response) => {
-  const data = response.notification.request.content.data;
-  if (data?.type === 'reminder' && data?.bookmarkId) {
-    console.log('[Notification] 点击了阅读提醒，收藏 ID:', data.bookmarkId);
-  }
-});

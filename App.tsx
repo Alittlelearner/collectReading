@@ -19,11 +19,14 @@ export default function App() {
       try {
         await runMigrations();
         await seedData();
-        await syncAchievements();
 
         if (mounted) {
           setReady(true);
         }
+
+        syncAchievements().catch((err) => {
+          console.warn('[App] Failed to sync achievements', err);
+        });
       } catch (err) {
         console.error('[App] Failed to initialize', err);
         if (mounted) {

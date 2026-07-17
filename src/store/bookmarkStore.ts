@@ -69,7 +69,7 @@ export const useBookmarkStore = create<BookmarkState>((set, get) => ({
   },
 
   addBookmark: async (dto) => {
-    const bookmark = await bookmarkService.create(dto);
+    const bookmark = await bookmarkService.createPlaceholder(dto);
     await Promise.all([
       get().loadBookmarks(),
       get().loadSidebarStats(),
@@ -77,6 +77,7 @@ export const useBookmarkStore = create<BookmarkState>((set, get) => ({
       useTagStore.getState().loadTags(),
       useFolderStore.getState().loadFolders(),
     ]);
+    bookmarkService.enqueueMetadataHydration(bookmark.id);
     return bookmark;
   },
 

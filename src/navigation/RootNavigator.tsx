@@ -14,6 +14,11 @@ import SourceGroupScreen from '../screens/SourceGroupScreen';
 import StatsDashboardScreen from '../screens/StatsDashboardScreen';
 import WikiHubScreen from '../screens/WikiHubScreen';
 import WikiDetailScreen from '../screens/WikiDetailScreen';
+import LibraryScreen from '../screens/LibraryScreen';
+import LibraryItemDetailScreen from '../screens/LibraryItemDetailScreen';
+import MarkdownNotesScreen from '../screens/MarkdownNotesScreen';
+import MarkdownNoteDetailScreen from '../screens/MarkdownNoteDetailScreen';
+import MarkdownNoteEditorScreen from '../screens/MarkdownNoteEditorScreen';
 import ProfileScreen from '../screens/ProfileScreen';
 import SettingsScreen from '../screens/SettingsScreen';
 import AchievementsScreen from '../screens/AchievementsScreen';
@@ -44,6 +49,11 @@ function HomeStackNavigator() {
       <HomeStack.Screen name="StatsDashboard" component={StatsDashboardScreen} options={{ title: '阅读统计' }} />
       <HomeStack.Screen name="WikiHub" component={WikiHubScreen} options={{ title: '实验 Wiki' }} />
       <HomeStack.Screen name="WikiDetail" component={WikiDetailScreen} options={{ title: 'Wiki 详情' }} />
+      <HomeStack.Screen name="Library" component={LibraryScreen} options={{ title: 'Bookshelf' }} />
+      <HomeStack.Screen name="LibraryItemDetail" component={LibraryItemDetailScreen} options={{ title: 'Book Detail' }} />
+      <HomeStack.Screen name="MarkdownNotes" component={MarkdownNotesScreen} options={{ title: 'Markdown Notes' }} />
+      <HomeStack.Screen name="MarkdownNoteDetail" component={MarkdownNoteDetailScreen} options={{ title: 'Note Detail' }} />
+      <HomeStack.Screen name="MarkdownNoteEditor" component={MarkdownNoteEditorScreen} options={{ title: 'Write Note' }} />
       <HomeStack.Screen name="ProfileMain" component={ProfileScreen} options={{ headerShown: false }} />
       <HomeStack.Screen name="Settings" component={SettingsScreen} options={{ title: '设置' }} />
       <HomeStack.Screen name="Achievements" component={AchievementsScreen} options={{ title: '成就' }} />

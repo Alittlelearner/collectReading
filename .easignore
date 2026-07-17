@@ -1,0 +1,10 @@
+.git
+.expo
+.npm-cache
+.codex-verify
+.agents
+node_modules
+*.log
+*.tmp
+*.temp
+.tmp-home-verify.png

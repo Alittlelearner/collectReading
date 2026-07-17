@@ -1,7 +1,7 @@
 import type { AppDatabase } from './database';
 
 export type BackupPayload = {
-  version: 2;
+  version: 3;
   app: 'collectionRead';
   exportedAt: string;
   tables: {
@@ -15,6 +15,9 @@ export type BackupPayload = {
     achievements: any[];
     userSettings: any[];
     wikiSpaces: any[];
+    libraryItems: any[];
+    markdownNotes: any[];
+    noteAssets: any[];
   };
 };
 
@@ -29,6 +32,9 @@ export type ImportSummary = {
   achievements: number;
   userSettings: number;
   wikiSpaces: number;
+  libraryItems: number;
+  markdownNotes: number;
+  noteAssets: number;
   skipped: number;
 };
 
@@ -46,8 +52,27 @@ type LegacyBackupPayload = {
   settings?: any[];
   userSettings?: any[];
   wikiSpaces?: any[];
+  libraryItems?: any[];
+  markdownNotes?: any[];
+  noteAssets?: any[];
   tables?: Partial<BackupPayload['tables']>;
 };
+
+const BACKUP_TABLE_NAMES = [
+  'bookmarks',
+  'tags',
+  'bookmarkTags',
+  'folders',
+  'bookmarkFolders',
+  'notes',
+  'dailyStats',
+  'achievements',
+  'userSettings',
+  'wikiSpaces',
+  'libraryItems',
+  'markdownNotes',
+  'noteAssets',
+] as const;
 
 function rows(value: unknown): any[] {
   return Array.isArray(value) ? value : [];
@@ -65,28 +90,43 @@ function emptySummary(): ImportSummary {
     achievements: 0,
     userSettings: 0,
     wikiSpaces: 0,
+    libraryItems: 0,
+    markdownNotes: 0,
+    noteAssets: 0,
     skipped: 0,
   };
 }
 
 export async function collectBackupPayload(db: AppDatabase): Promise<BackupPayload> {
   return {
-    version: 2,
+    version: 3,
     app: 'collectionRead',
     exportedAt: new Date().toISOString(),
     tables: {
-      bookmarks: await db.getAllAsync('SELECT * FROM bookmarks'),
-      tags: await db.getAllAsync('SELECT * FROM tags'),
-      bookmarkTags: await db.getAllAsync('SELECT * FROM bookmark_tags'),
-      folders: await db.getAllAsync('SELECT * FROM folders'),
-      bookmarkFolders: await db.getAllAsync('SELECT * FROM bookmark_folders'),
-      notes: await db.getAllAsync('SELECT * FROM notes'),
-      dailyStats: await db.getAllAsync('SELECT * FROM daily_stats'),
-      achievements: await db.getAllAsync('SELECT * FROM achievements'),
-      userSettings: await db.getAllAsync('SELECT * FROM user_settings'),
-      wikiSpaces: await db.getAllAsync('SELECT * FROM wiki_spaces'),
+      bookmarks: await safeGetAll(db, 'bookmarks'),
+      tags: await safeGetAll(db, 'tags'),
+      bookmarkTags: await safeGetAll(db, 'bookmark_tags'),
+      folders: await safeGetAll(db, 'folders'),
+      bookmarkFolders: await safeGetAll(db, 'bookmark_folders'),
+      notes: await safeGetAll(db, 'notes'),
+      dailyStats: await safeGetAll(db, 'daily_stats'),
+      achievements: await safeGetAll(db, 'achievements'),
+      userSettings: await safeGetAll(db, 'user_settings'),
+      wikiSpaces: await safeGetAll(db, 'wiki_spaces'),
+      libraryItems: await safeGetAll(db, 'library_items'),
+      markdownNotes: await safeGetAll(db, 'markdown_notes'),
+      noteAssets: await safeGetAll(db, 'note_assets'),
     },
   };
+}
+
+async function safeGetAll(db: AppDatabase, tableName: string): Promise<any[]> {
+  try {
+    return await db.getAllAsync(`SELECT * FROM ${tableName}`);
+  } catch (err) {
+    console.warn(`[backupPayload] Skipping unavailable table ${tableName}`, err);
+    return [];
+  }
 }
 
 export function normalizeBackupPayload(input: unknown): BackupPayload | null {
@@ -98,12 +138,12 @@ export function normalizeBackupPayload(input: unknown): BackupPayload | null {
   const tableSource = data.tables || data;
   const bookmarks = rows(tableSource.bookmarks);
 
-  if (bookmarks.length === 0 && !Array.isArray(tableSource.bookmarks)) {
+  if (!BACKUP_TABLE_NAMES.some((tableName) => Array.isArray(tableSource[tableName]))) {
     return null;
   }
 
   return {
-    version: 2,
+    version: 3,
     app: 'collectionRead',
     exportedAt: data.exportDate || new Date().toISOString(),
     tables: {
@@ -117,6 +157,9 @@ export function normalizeBackupPayload(input: unknown): BackupPayload | null {
       achievements: rows(tableSource.achievements),
       userSettings: rows(tableSource.userSettings || data.settings),
       wikiSpaces: rows(tableSource.wikiSpaces),
+      libraryItems: rows(tableSource.libraryItems),
+      markdownNotes: rows(tableSource.markdownNotes),
+      noteAssets: rows(tableSource.noteAssets),
     },
   };
 }
@@ -134,6 +177,9 @@ export function summarizeBackup(payload: BackupPayload): ImportSummary {
     achievements: payload.tables.achievements.length,
     userSettings: payload.tables.userSettings.length,
     wikiSpaces: payload.tables.wikiSpaces.length,
+    libraryItems: payload.tables.libraryItems.length,
+    markdownNotes: payload.tables.markdownNotes.length,
+    noteAssets: payload.tables.noteAssets.length,
   };
 }
 
@@ -370,6 +416,85 @@ export async function restoreBackupPayload(db: AppDatabase, payload: BackupPaylo
         wiki.updated_at || Date.now(),
       );
       summary.wikiSpaces += 1;
+    }
+
+    for (const item of payload.tables.libraryItems) {
+      if (!item?.id || !item?.file_path) {
+        summary.skipped += 1;
+        continue;
+      }
+      await db.runAsync(
+        `INSERT OR REPLACE INTO library_items
+         (id, title, author, file_name, file_ext, mime_type, file_path, cover_path,
+          file_size, source_uri, status, progress, current_location, imported_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        item.id,
+        item.title || item.file_name || 'Untitled',
+        item.author ?? null,
+        item.file_name || '',
+        item.file_ext || '',
+        item.mime_type ?? null,
+        item.file_path,
+        item.cover_path ?? null,
+        item.file_size ?? 0,
+        item.source_uri ?? null,
+        item.status || 'unread',
+        item.progress ?? 0,
+        item.current_location ?? null,
+        item.imported_at || Date.now(),
+        item.updated_at || Date.now(),
+        item.deleted_at ?? null,
+      );
+      summary.libraryItems += 1;
+    }
+
+    for (const markdownNote of payload.tables.markdownNotes) {
+      if (!markdownNote?.id || !markdownNote?.markdown_path) {
+        summary.skipped += 1;
+        continue;
+      }
+      const linkedBookmarkId =
+        bookmarkIdMap.get(markdownNote.linked_bookmark_id) || markdownNote.linked_bookmark_id || null;
+      await db.runAsync(
+        `INSERT OR REPLACE INTO markdown_notes
+         (id, title, slug, folder_path, markdown_path, content_cache, excerpt,
+          linked_book_id, linked_bookmark_id, word_count, created_at, updated_at, deleted_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        markdownNote.id,
+        markdownNote.title || 'Untitled Note',
+        markdownNote.slug || '',
+        markdownNote.folder_path || '',
+        markdownNote.markdown_path,
+        markdownNote.content_cache || '',
+        markdownNote.excerpt || '',
+        markdownNote.linked_book_id ?? null,
+        linkedBookmarkId,
+        markdownNote.word_count ?? 0,
+        markdownNote.created_at || Date.now(),
+        markdownNote.updated_at || Date.now(),
+        markdownNote.deleted_at ?? null,
+      );
+      summary.markdownNotes += 1;
+    }
+
+    for (const asset of payload.tables.noteAssets) {
+      if (!asset?.id || !asset?.note_id || !asset?.file_path) {
+        summary.skipped += 1;
+        continue;
+      }
+      await db.runAsync(
+        `INSERT OR REPLACE INTO note_assets
+         (id, note_id, file_name, file_path, mime_type, size, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        asset.id,
+        asset.note_id,
+        asset.file_name || '',
+        asset.file_path,
+        asset.mime_type ?? null,
+        asset.size ?? 0,
+        asset.created_at || Date.now(),
+      );
+      summary.noteAssets += 1;
     }
 
     await db.execAsync('COMMIT');

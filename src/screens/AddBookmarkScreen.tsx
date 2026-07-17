@@ -57,6 +57,18 @@ function parseBatchUrls(value: string): string[] {
     });
 }
 
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (typeof error === 'string' && error) {
+    return error;
+  }
+
+  return '未知错误';
+}
+
 export default function AddBookmarkScreen() {
   const navigation = useNavigation();
   const bookmarks = useBookmarks();
@@ -167,10 +179,13 @@ export default function AddBookmarkScreen() {
       resetForm();
       navigation.goBack();
     } catch (err: any) {
-      if (err.message === 'DUPLICATE_URL') {
+      const message = getErrorMessage(err);
+      console.error('[AddBookmark] Failed to add bookmark', err);
+
+      if (message === 'DUPLICATE_URL') {
         Alert.alert('已经收藏过了', '这条链接已经在你的收藏里。');
       } else {
-        setError('添加失败，请稍后重试');
+        setError(`添加失败：${message}`);
       }
       setLoading(false);
     }
@@ -219,7 +234,10 @@ export default function AddBookmarkScreen() {
         bookmarkService.enqueueMetadataHydration(bookmark.id);
         added += 1;
       } catch (err: any) {
-        if (err.message === 'DUPLICATE_URL') {
+        const message = getErrorMessage(err);
+        console.error('[AddBookmark] Failed to add batch item', item, err);
+
+        if (message === 'DUPLICATE_URL') {
           duplicated += 1;
         } else {
           failed += 1;

@@ -68,6 +68,53 @@ export interface Note {
   updatedAt: number;
 }
 
+export type LibraryItemStatus = 'unread' | 'reading' | 'finished';
+
+export interface LibraryItem {
+  id: string;
+  title: string;
+  author: string | null;
+  fileName: string;
+  fileExt: string;
+  mimeType: string | null;
+  filePath: string;
+  coverPath: string | null;
+  fileSize: number;
+  sourceUri: string | null;
+  status: LibraryItemStatus;
+  progress: number;
+  currentLocation: string | null;
+  importedAt: number;
+  updatedAt: number;
+  deletedAt: number | null;
+}
+
+export interface MarkdownNote {
+  id: string;
+  title: string;
+  slug: string;
+  folderPath: string;
+  markdownPath: string;
+  content: string;
+  excerpt: string;
+  linkedBookId: string | null;
+  linkedBookmarkId: string | null;
+  wordCount: number;
+  createdAt: number;
+  updatedAt: number;
+  deletedAt: number | null;
+}
+
+export interface NoteAsset {
+  id: string;
+  noteId: string;
+  fileName: string;
+  filePath: string;
+  mimeType: string | null;
+  size: number;
+  createdAt: number;
+}
+
 export interface DailyStat {
   date: string;
   readCount: number;

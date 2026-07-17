@@ -102,7 +102,7 @@ export default function BookmarkCard({ bookmark, onPress, onToggleStar }: Bookma
 
           <View style={styles.metaGroup}>
             <Text style={styles.metaText}>{formatRelativeDate(bookmark.createdAt)}</Text>
-            <Text style={styles.metaDivider}>·</Text>
+            <View style={styles.metaDivider} />
             <Text style={styles.metaText}>{bookmark.readCount} 次阅读</Text>
           </View>
         </View>
@@ -269,7 +269,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   metaDivider: {
-    color: colors.textMuted,
-    fontSize: 12,
+    width: 3,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: colors.textMuted,
   },
 });
